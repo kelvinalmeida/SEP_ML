@@ -1,0 +1,24 @@
+services:
+  controller:
+    build: ./control/
+    container_name: controller_container
+    working_dir: /app
+    volumes:
+      - session:/app/instance/
+    ports:
+      - "5000:5000"
+    command: "flask run --host=0.0.0.0"
+
+  user:
+    build: ./user/
+    container_name: user_container
+    working_dir: /app
+    volumes:
+      - user:/app/instance/
+    ports:
+      - "5001:5000"
+    command: "flask run --host=0.0.0.0"
+
+volumes:
+  session:
+  user:
