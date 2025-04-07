@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
-from .models import Student, Teacher
-from . import db
+from ..models import Student, Teacher
+from .. import db
 
 main = Blueprint("main", __name__)
 
