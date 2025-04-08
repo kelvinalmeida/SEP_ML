@@ -1,22 +1,37 @@
 services:
+  gateway:
+    build: ./gateway/
+    container_name: gateway_container
+    working_dir: /app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./gateway:/app # <-- monta o diretório local no container
+    command: "flask run --host=0.0.0.0"
+    depends_on:
+      - controller
+      - user
+
   controller:
     build: ./control/
     container_name: controller_container
     working_dir: /app
-    volumes:
-      - session:/app/instance/
     ports:
-      - "5000:5000"
+      - "5001:5000"
+    volumes:
+      - ./control:/app
+      - session:/app/instance/
     command: "flask run --host=0.0.0.0"
 
   user:
     build: ./user/
     container_name: user_container
     working_dir: /app
-    volumes:
-      - user:/app/instance/
     ports:
-      - "5001:5000"
+      - "5002:5000"
+    volumes:
+      - ./user:/app
+      - user:/app/instance/
     command: "flask run --host=0.0.0.0"
 
 volumes:

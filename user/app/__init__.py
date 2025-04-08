@@ -15,7 +15,9 @@ def create_app():
 
     from .routes.students_routes import student_bp
     from .routes.teachers_routes import teachers_bp
+    from .routes.login import auth_bp
     app.register_blueprint(student_bp)
     app.register_blueprint(teachers_bp)
+    app.register_blueprint(auth_bp)
 
     return app
