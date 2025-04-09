@@ -13,11 +13,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Definir a variável de ambiente para ativar o modo de desenvolvimento do Flask
 ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_RUN_PORT=5002
 ENV FLASK_ENV=development
 
 
 # Expor a porta padrão do Flask
-EXPOSE 5000
+EXPOSE 5002
 
 # Rodar o aplicativo Flask
 CMD ["flask", "run", "--host=0.0.0.0"]

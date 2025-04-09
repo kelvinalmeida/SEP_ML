@@ -51,7 +51,7 @@ def update_student(student_id):
         return jsonify({"message": "Aluno atualizado!", "student": data})
     return jsonify({"error": "Aluno não encontrado"}), 404
 
-@student_bp.route("/students", methods=["DELETE"])
+@student_bp.route("/students/<int:student_id>", methods=["DELETE"])
 def delete_student(student_id):
     student = Student.query.get(student_id)
     if student:
