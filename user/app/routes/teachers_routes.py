@@ -10,16 +10,18 @@ teachers_bp = Blueprint("teachers_bp", __name__)
 def create_teacher():
 
     if(request.method == "POST"):
-        name = request.form["name"]
-        age = request.form["age"]
+        name = request.json["name"]
+        age = request.json["age"]
         type = "teacher"
+        username = request.json["username"]
+        password = request.json["password"]
 
-        teacher = Teacher(name=name, age=age, type=type)
+        teacher = Teacher(name=name, age=age, type=type, username=username, password_hash=password)
         db.session.add(teacher)
         db.session.commit()
-        return redirect(url_for('teachers_bp.success', type='Professor'))
+        return jsonify({"message": "Professor criado com sucesso!"}), 200  # Retorna uma mensagem de sucesso
     
-    return render_template("create_teacher.html"), 200  # Exibe o formulário 
+    return jsonify({"error": "Método não permitido"}), 405  # Retorna um erro se o método não for POST
     
 
 @teachers_bp.route("/teachers", methods=["GET"])

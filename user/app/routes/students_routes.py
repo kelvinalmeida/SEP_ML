@@ -11,26 +11,24 @@ def index():
 @student_bp.route("/students/create", methods=["GET", "POST"])
 def create_student():
     if request.method == "POST":
-        name = request.form["name"]
-        age = request.form["age"]
-        course = request.form["course"]
+        name = request.json["name"]
+        age = request.json["age"]
+        course = request.json["course"]
         type = "student"
+        username = request.json["username"]
+        password = request.json["password"]
 
-        student = Student(name=name, age=age, course=course, type=type)
+        student = Student(name=name, age=age, course=course, type=type, username=username, password_hash=password)
         db.session.add(student)
         db.session.commit()
-        return redirect(url_for('student_bp.success', type='aluno'))
+        return jsonify({"message": "Aluno criado com sucesso!"}), 200
 
-    return render_template("create_student.html")
-
-@student_bp.route("/success/<string:type>")
-def success(type):
-    return f'{type} criada com sucesso!'
+    return jsonify({"error": "Método não permitido"}), 405
 
 @student_bp.route("/students", methods=["GET"])
-def get_students():
+def get_students(): 
     students = Student.query.all()
-    return jsonify([{"id": s.id, "name": s.name, "age": s.age, "course": s.course} for s in students])
+    return jsonify([{"id": s.id, "name": s.name, "age": s.age, "course": s.course, "type": s.type, "username": s.username, "password": s.password_hash} for s in students])
 
 @student_bp.route("/students/<int:student_id>", methods=["GET"])
 def get_student(student_id):

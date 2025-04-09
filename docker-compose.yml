@@ -5,6 +5,12 @@ services:
     working_dir: /app
     ports:
       - "5000:5000"
+    volumes:
+      - ./gateway:/app # Monta o diretório local no container para hot reload
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_APP=app.py # Substitua se o arquivo principal tiver outro nome
     command: "flask run --host=0.0.0.0"
     depends_on:
       - controller
@@ -17,7 +23,11 @@ services:
     ports:
       - "5001:5001"
     volumes:
-      - session:/app/instance/
+      - ./control:/app
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_APP=app.py
     command: "flask run --host=0.0.0.0"
 
   user:
@@ -27,9 +37,14 @@ services:
     ports:
       - "5002:5002"
     volumes:
-      - user:/app/instance/
+      - ./user:/app
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_APP=app.py
     command: "flask run --host=0.0.0.0"
 
+# Volumes nomeados (se precisar persistência em banco ou arquivos locais)
 volumes:
   session:
   user:

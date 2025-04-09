@@ -19,11 +19,38 @@ def login_page():
 # 👨‍🎓 STUDENT ENDPOINTS
 # ===========================
 
+@gateway_bp.route('/students/create', methods=['POST', 'GET'])
+def create_students():
+    if request.method == 'POST':
+        # Get the form data
+        name = request.form["name"]
+        age = request.form["age"]
+        course = request.form["course"]
+        type = "student"
+        username = request.form["username"]
+        password = request.form["password"]
+
+        student = {"name": name, "age": age, "course": course, "type": type, "username": username, "password": password}
+        
+        try:
+            response = requests.post(f"{USER_URL}/students/create", json=student)
+            if response.status_code == 200:
+                json_response = response.json()
+                return jsonify(json_response), 200
+            else:
+                return jsonify({"error": "Failed to create student", "details": response.text}), response.status_code
+        except RequestException as e:
+            return jsonify({"error": "User service unavailable", "details": str(e)}), 503
+    
+    return render_template("./user/create_student.html")
+    
+
 @gateway_bp.route('/students', methods=['GET'])
 def get_students():
     try:
         response = requests.get(f"{USER_URL}/students")
-        return (response.text, response.status_code, response.headers.items())
+        students = response.json()  # pega o JSON
+        return render_template("./user/list_students.html", students=students)
     except RequestException as e:
         return jsonify({"error": "User service unavailable", "details": str(e)}), 503
 
@@ -46,6 +73,30 @@ def handle_student(student_id):
 # ===========================
 # 👨‍🏫 TEACHER ENDPOINTS
 # ===========================
+
+@gateway_bp.route('/teachers/create', methods=['POST', 'GET'])
+def create_teacher():
+    if request.method == 'POST':
+        # Get the form data
+        name = request.form["name"]
+        age = request.form["age"]
+        type = "teacher"
+        username = request.form["username"]
+        password = request.form["password"]
+
+        teacher = {"name": name, "age": age, "type": type, "username": username, "password": password}
+        
+        try:
+            response = requests.post(f"{USER_URL}/teachers/create", json=teacher)
+            if response.status_code == 200:
+                json_response = response.json()
+                return jsonify(json_response), 200
+            else:
+                return jsonify({"error": "Failed to create teacher", "details": response.text}), response.status_code
+        except RequestException as e:
+            return jsonify({"error": "User service unavailable", "details": str(e)}), 503
+    
+    return render_template("./user/create_teacher.html")
 
 @gateway_bp.route('/teachers', methods=['GET'])
 def get_teachers():

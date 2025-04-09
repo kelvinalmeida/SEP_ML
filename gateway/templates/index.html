@@ -1,20 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>API Gateway</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
 </head>
 
-<body>
-    <h1>Hello API Gateway!</h1>
-    <ul>
-        <li><a href="/students">Ver todos os Estudantes</a></li>
-        <li><a href="/teachers">Ver todos os Professores</a></li>
-        <li><a href="/sessions">Criar Sessão</a></li>
-    </ul>
-</body>
+<body class="bg-light min-vh-100 d-flex flex-column">
 
+    <!-- Topo com conteúdo -->
+    <header class="bg-primary text-white py-4">
+        <div class="container text-center">
+            <h1 class="mb-4">Sistema Tutor!</h1>
+
+            <div class="d-flex flex-wrap justify-content-center gap-3">
+                <a href="/students" class="btn btn-light">Ver Estudantes</a>
+                <a href="/teachers" class="btn btn-light">Ver Professores</a>
+                <a href="/sessions/create" class="btn btn-light">Criar Sessão</a>
+                <a href="/students/create" class="btn btn-light">Criar Aluno</a>
+                <a href="/teachers/create" class="btn btn-light">Criar Professor</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Parte de baixo vazia -->
+    <main class="flex-fill">
+        <!-- Espaço vazio -->
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq"
+        crossorigin="anonymous"></script>
+</body>
 
 </html>
