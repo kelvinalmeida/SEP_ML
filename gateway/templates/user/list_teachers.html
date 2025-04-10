@@ -11,17 +11,21 @@
 
 <body class="bg-light">
     <div class="container py-5">
-        <h1 class="mb-4 text-center">Todas as Sessoes</h1>
+        <h1 class="mb-4 text-center">Lista de Professores</h1>
 
         <div class="row g-4">
-            {% for session in sessions %}
+            {% for teacher in teachers %}
             <div class="col-md-4">
                 <div class="card shadow-sm h-100">
                     <div class="card-body">
+                        <h5 class="card-title">{{ teacher.name }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">@{{ teacher.username }}</h6>
                         <p class="card-text">
-                            <strong>ID:</strong> {{ session.id }}<br>
-                            <strong>Tipo:</strong> {{ session.status }}<br>
-                            <strong>Estrategia:</strong> {{ session.strategy }}<br>
+                            <strong>Idade:</strong> {{ teacher.age }}<br>
+                            <strong>ID:</strong> {{ teacher.id }}<br>
+                            <strong>Tipo:</strong> {{ teacher.type }}<br>
+                            <strong>username:</strong> {{ teacher.username }}<br>
+                            <strong>password:</strong> {{ teacher.password }}<br>
                         </p>
                     </div>
                 </div>

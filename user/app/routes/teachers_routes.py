@@ -27,7 +27,7 @@ def create_teacher():
 @teachers_bp.route("/teachers", methods=["GET"])
 def get_teachers():
     teachers = Teacher.query.all()
-    return jsonify([{"id": t.id, "name": t.name, "age": t.age, "type": t.type} for t in teachers])
+    return jsonify([{"id": t.id, "name": t.name, "age": t.age, "type": t.type, "username": t.username, "password": t.password_hash} for t in teachers])
 
 @teachers_bp.route("/teachers/<int:teacher_id>", methods=["GET"])
 def get_teacher(teacher_id):
