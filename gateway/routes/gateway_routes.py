@@ -14,6 +14,21 @@ CONTROL_URL = 'http://controller:5001'
 
 SECRET_KEY = "sua_chave_super_secreta"
 
+
+# @app.context_processor
+# def inject_current_user():
+#     token = request.cookies.get("access_token")
+#     current_user = None
+
+#     if token:
+#         try:
+#             current_user = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+#         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+#             current_user = None
+
+#     return dict(current_user=current_user)
+
+
 def verificar_cookie():
     token = request.cookies.get("access_token")
     current_user = None
@@ -48,11 +63,15 @@ def token_required(f):
 
 
 @gateway_bp.route("/")
-def home_page(current_user=None):
+def home_page():
     print("Entrou na home")
     current_user = verificar_cookie()
-    return render_template("index.html", user=current_user)
 
+    if current_user:
+        # Se o usuário estiver autenticado, redireciona para a página de inicial
+        return render_template("dashboard.html", current_user=current_user)
+    
+    return render_template("start.html")
 
 
 @gateway_bp.route('/login', methods=['POST', 'GET'])
@@ -67,7 +86,7 @@ def login():
                 token = response.json().get("token")
                 
                 # Criar resposta com cookie
-                resp = make_response(redirect(url_for('gateway_bp.perfil')))  # exemplo
+                resp = make_response(redirect(url_for('gateway_bp.home_page')))  # exemplo
                 resp.set_cookie('access_token', token, httponly=True, max_age=3600)  # 1 hora
                 return resp
             else:
@@ -80,7 +99,7 @@ def login():
 @gateway_bp.route('/logout')
 def logout():
     # Criar uma resposta redirecionando para a tela de login
-    resp = make_response(redirect(url_for('gateway_bp.login')))
+    resp = make_response(redirect(url_for('gateway_bp.home_page')))
     
     # Remover o cookie do token
     resp.set_cookie('access_token', '', expires=0)
@@ -98,8 +117,6 @@ def perfil(current_user=None):
     response = requests.get(url)
     user = response.json()
     return render_template('perfil.html', user=user)
-
-
 
 
 # ===========================
@@ -133,6 +150,7 @@ def create_students():
     
 
 @gateway_bp.route('/students', methods=['GET'])
+@token_required
 def get_students():
     try:
         response = requests.get(f"{USER_URL}/students")
@@ -143,6 +161,7 @@ def get_students():
 
 
 @gateway_bp.route('/students/<int:student_id>', methods=['GET', 'PUT', 'DELETE'])
+@token_required
 def get_student_by_id(student_id):
     try:
         url = f"{USER_URL}/students/{student_id}"
@@ -162,7 +181,6 @@ def get_student_by_id(student_id):
 # ===========================
 
 @gateway_bp.route('/teachers/create', methods=['POST', 'GET'])
-@token_required
 def create_teacher(current_user=None):
     if request.method == 'POST':
         # Get the form data
@@ -187,6 +205,7 @@ def create_teacher(current_user=None):
     return render_template("./user/create_teacher.html")
 
 @gateway_bp.route('/teachers', methods=['GET'])
+@token_required
 def get_teachers():
     try:
         response = requests.get(f"{USER_URL}/teachers")
@@ -197,6 +216,7 @@ def get_teachers():
 
 
 @gateway_bp.route('/teachers/<int:teacher_id>', methods=['GET', 'PUT', 'DELETE'])
+@token_required
 def handle_teacher(teacher_id):
     try:
         url = f"{USER_URL}/teachers/{teacher_id}"
@@ -216,6 +236,7 @@ def handle_teacher(teacher_id):
 # ===========================
 
 @gateway_bp.route('/sessions/create', methods=['GET', "POST"])
+@token_required
 def create():
     if request.method == 'POST':
         try:
@@ -232,6 +253,7 @@ def create():
         return render_template("./control/create_session.html")
 
 @gateway_bp.route('/sessions', methods=['GET'])
+@token_required
 def list_sessions():
     try:
         response = requests.get(f"{CONTROL_URL}/sessions")
@@ -245,6 +267,7 @@ def list_sessions():
 
 
 @gateway_bp.route('/sessions/status/<int:session_id>', methods=['GET'])
+@token_required
 def get_session_status(session_id):
     try:
         response = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}")
@@ -254,6 +277,7 @@ def get_session_status(session_id):
 
 
 @gateway_bp.route('/sessions/start/<int:session_id>', methods=['POST'])
+@token_required
 def start_session(session_id):
     try:
         response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
@@ -263,6 +287,7 @@ def start_session(session_id):
 
 
 @gateway_bp.route('/sessions/end/<int:session_id>', methods=['POST'])
+@token_required
 def end_session(session_id):
     try:
         response = requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")

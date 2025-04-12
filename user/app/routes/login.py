@@ -11,9 +11,18 @@ def login():
     username = data.get('username')
     password = data.get('password')
 
-    user = Student.query.filter_by(username=username).first()
+    user_student = Student.query.filter_by(username=username).first()
+    user_teacher = Teacher.query.filter_by(username=username).first()
+    
+    if user_student:
+        user = user_student
+    else:
+        user = user_teacher
+
     if not user:
-        return jsonify({'error': 'not find username!'}), 401
+        return jsonify({'error': 'User not found'}), 404
+    
+    # print(f"User found: {user.username}, Type: {user.type}, password: {user.password_hash}")
 
     if user and user.check_password(password):
         token = jwt.encode({

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Gateway - SEP_ML</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        header {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-buttons a {
+            min-width: 160px;
+        }
+
+        .welcome-message {
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        h1,
+        h2 {
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+
+    <!-- Topo com conteúdo -->
+    <header class="bg-primary text-white py-4">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <!-- Título -->
+                <div>
+                    <h1 class="mb-0">SEP_ML</h1>
+                    <small class="text-light">Sessões de ensino Personalizadas</small>
+                </div>
+
+                <!-- Botão de Login/Logout -->
+                <div>
+                    {% if current_user %}
+                    <a href="/logout" class="btn btn-outline-light">Logout</a>
+                    {% else %}
+                    <a href="/login" class="btn btn-outline-light">Login</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Navegação -->
+            <div class="mt-4 nav-buttons d-flex flex-wrap justify-content-center gap-3">
+                <a href="/students" class="btn btn-light">Ver Estudantes</a>
+                <a href="/teachers" class="btn btn-light">Ver Professores</a>
+                <a href="/sessions" class="btn btn-light">Ver Sessões</a>
+
+                {% if current_user and current_user.type == 'teacher' %}
+                <a href="/sessions/create" class="btn btn-light">Criar Sessão</a>
+                <a href="/students/create" class="btn btn-light">Criar Aluno</a>
+                <a href="/teachers/create" class="btn btn-light">Criar Professor</a>
+                <a href="/perfil" class="btn btn-light">Perfil</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Mensagem de boas-vindas -->
+    <div class="welcome-message container">
+        {% if current_user %}
+        <h2 class="text-primary">Bem-vindo(a), {{ current_user.name }}!</h2>
+        <p class="lead">Tipo de usuário: {{ current_user.type | capitalize }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Parte de baixo vazia -->
+    <main class="flex-fill">
+        <!-- Conteúdo futuro -->
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

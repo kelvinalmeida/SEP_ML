@@ -9,13 +9,24 @@
 
 <body class="bg-light text-center">
     <div class="container mt-5">
-        <div class="card shadow p-4">
-            <h2 class="mb-4">Welcome {{ user.name }} to Your Perfil</h2>
-            <p><strong>User ID:</strong> {{ user.id }}</p>
-            <p><strong>User Name:</strong> {{ user.name }}</p>
-            <p><strong>User Age:</strong> {{ user.age }}</p>
-            <p><strong>User Course:</strong> {{ user.course }}</p>
+        <div class="d-flex align-items-center justify-content-center gap-4">
+            <!-- Imagem do usuário -->
+            <div class="shadow p-3 border border-primary rounded-circle">
+                <img src="https://icon-library.com/images/user-png-icon/user-png-icon-16.jpg" alt="Minha Imagem"
+                    class="img-fluid" style="width: 120px; height: 120px;">
+            </div>
+
+            <!-- Textos do perfil -->
+            <div class="shadow p-4 bg-white rounded text-start">
+                <h2 class="mb-4">Welcome {{ user.name }} to Your Perfil</h2>
+                <p><strong>User ID:</strong> {{ user.id }}</p>
+                <p><strong>User Name:</strong> {{ user.name }}</p>
+                <p><strong>User Age:</strong> {{ user.age }}</p>
+                <p><strong>User Course:</strong> {{ user.course }}</p>
+            </div>
         </div>
+
+        <a href="/" class="btn btn-primary mt-4">Voltar para Home Page</a>
     </div>
 </body>
 
