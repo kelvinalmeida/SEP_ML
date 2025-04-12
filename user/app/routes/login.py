@@ -1,24 +1,27 @@
-from flask import Blueprint, request, jsonify
+import jwt
+import datetime
+from flask import Blueprint, request, jsonify, current_app
 from ..models import Student, Teacher
 
-auth_bp = Blueprint("auth_bp", __name__)
+auth_bp = Blueprint('auth_bp', __name__)
 
-# routes/auth.py ou dentro do auth_bp
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
 
-    # Busca no banco por student
-    student = Student.query.filter_by(username=username).first()
-    if student and student.check_password(password):
-        return jsonify({"message": "Login successful", "role": "student", "user_id": student.id}), 200
+    user = Student.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({'error': 'not find username!'}), 401
 
-    # Busca no banco por teacher se não achou como student
-    teacher = Teacher.query.filter_by(username=username).first()
-    if teacher and teacher.check_password(password):
-        return jsonify({"message": "Login successful", "role": "teacher", "user_id": teacher.id}), 200
+    if user and user.check_password(password):
+        token = jwt.encode({
+            'id': user.id,
+            'type': user.type,
+            'name': user.name,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+        }, current_app.config['SECRET_KEY'], algorithm='HS256')
+        return jsonify({'token': token})
 
-    return jsonify({"message": "Invalid username or password"}), 401
-
+    return jsonify({'error': 'Invalid credentials'}), 401

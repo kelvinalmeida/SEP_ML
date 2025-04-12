@@ -31,7 +31,7 @@ def get_students():
     return jsonify([{"id": s.id, "name": s.name, "age": s.age, "course": s.course, "type": s.type, "username": s.username, "password": s.password_hash} for s in students])
 
 @student_bp.route("/students/<int:student_id>", methods=["GET"])
-def get_student(student_id):
+def get_student_by_id(student_id):
     student = Student.query.get(student_id)
     if student:
         return jsonify({"id": student.id, "name": student.name, "age": student.age, "course": student.course})

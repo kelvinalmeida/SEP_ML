@@ -1,6 +1,9 @@
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for, make_response
 import requests
 from requests.exceptions import RequestException
+from functools import wraps
+import jwt
+
 
 gateway_bp = Blueprint('gateway_bp', __name__)
 
@@ -9,10 +12,94 @@ CONTROL_URL = 'http://controller:5001'
 # USER_URL = 'http://localhost:5002'
 # CONTROL_URL = 'http://localhost:5001'
 
+SECRET_KEY = "sua_chave_super_secreta"
+
+def verificar_cookie():
+    token = request.cookies.get("access_token")
+    current_user = None
+
+    if token:
+        try:
+            current_user = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            print("Token decodificado:", current_user)
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            current_user = None
+            print("Token inválido ou expirado")
+
+    return current_user
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.cookies.get("access_token")
+        if not token:
+            return redirect(url_for('gateway_bp.login'))
+
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            # Passa o payload (informações do usuário) como argumento extra
+            return f(*args, **kwargs, current_user=payload)
+        except jwt.ExpiredSignatureError:
+            return redirect(url_for('gateway_bp.login'))
+        except jwt.InvalidTokenError:
+            return redirect(url_for('gateway_bp.login'))
+
+    return decorated
+
 
 @gateway_bp.route("/")
-def login_page():
-    return render_template("index.html")
+def home_page(current_user=None):
+    print("Entrou na home")
+    current_user = verificar_cookie()
+    return render_template("index.html", user=current_user)
+
+
+
+@gateway_bp.route('/login', methods=['POST', 'GET'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        try:
+            response = requests.post(f"{USER_URL}/login", json={"username": username, "password": password})
+            if response.status_code == 200:
+                token = response.json().get("token")
+                
+                # Criar resposta com cookie
+                resp = make_response(redirect(url_for('gateway_bp.perfil')))  # exemplo
+                resp.set_cookie('access_token', token, httponly=True, max_age=3600)  # 1 hora
+                return resp
+            else:
+                return render_template("login.html", error="Login failed.")
+        except RequestException as e:
+            return render_template("login.html", error="User service unavailable.")
+    
+    return render_template("login.html")
+
+@gateway_bp.route('/logout')
+def logout():
+    # Criar uma resposta redirecionando para a tela de login
+    resp = make_response(redirect(url_for('gateway_bp.login')))
+    
+    # Remover o cookie do token
+    resp.set_cookie('access_token', '', expires=0)
+    
+    return resp
+
+
+@gateway_bp.route('/perfil')
+@token_required
+def perfil(current_user=None):
+    # print(current_user)
+    user_id = current_user['id']
+    url = f"{USER_URL}/students/{user_id}"
+    # print("dsadasdasdasd" + url)
+    response = requests.get(url)
+    user = response.json()
+    return render_template('perfil.html', user=user)
+
+
 
 
 # ===========================
@@ -56,7 +143,7 @@ def get_students():
 
 
 @gateway_bp.route('/students/<int:student_id>', methods=['GET', 'PUT', 'DELETE'])
-def handle_student(student_id):
+def get_student_by_id(student_id):
     try:
         url = f"{USER_URL}/students/{student_id}"
         if request.method == 'GET':
@@ -65,7 +152,7 @@ def handle_student(student_id):
             response = requests.put(url, json=request.get_json())
         elif request.method == 'DELETE':
             response = requests.delete(url)
-        return (response.text, response.status_code, response.headers.items())
+        return jsonify(response.json()), response.status_code
     except RequestException as e:
         return jsonify({"error": "User service unavailable", "details": str(e)}), 503
 
@@ -75,7 +162,8 @@ def handle_student(student_id):
 # ===========================
 
 @gateway_bp.route('/teachers/create', methods=['POST', 'GET'])
-def create_teacher():
+@token_required
+def create_teacher(current_user=None):
     if request.method == 'POST':
         # Get the form data
         name = request.form["name"]

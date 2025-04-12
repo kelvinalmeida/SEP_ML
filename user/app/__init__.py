@@ -9,6 +9,7 @@ def create_app():
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///../instance/users.db"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config['SECRET_KEY'] = 'sua_chave_super_secreta'
 
     db.init_app(app)
     migrate.init_app(app, db)
