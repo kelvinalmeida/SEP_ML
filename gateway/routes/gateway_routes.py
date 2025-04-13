@@ -111,9 +111,13 @@ def logout():
 @token_required
 def perfil(current_user=None):
     # print(current_user)
-    user_id = current_user['id']
-    url = f"{USER_URL}/students/{user_id}"
-    # print("dsadasdasdasd" + url)
+    if current_user["type"] == "student":
+        user_id = current_user['id']
+        url = f"{USER_URL}/students/{user_id}"
+    else:
+        user_id = current_user['id']
+        url = f"{USER_URL}/teachers/{user_id}"
+
     response = requests.get(url)
     user = response.json()
     return render_template('perfil.html', user=user)
