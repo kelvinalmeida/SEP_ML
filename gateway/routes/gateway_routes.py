@@ -151,7 +151,7 @@ def create_students():
 
 @gateway_bp.route('/students', methods=['GET'])
 @token_required
-def get_students():
+def get_students(current_user=None):
     try:
         response = requests.get(f"{USER_URL}/students")
         students = response.json()  # pega o JSON
@@ -162,7 +162,7 @@ def get_students():
 
 @gateway_bp.route('/students/<int:student_id>', methods=['GET', 'PUT', 'DELETE'])
 @token_required
-def get_student_by_id(student_id):
+def get_student_by_id(student_id, current_user=None):
     try:
         url = f"{USER_URL}/students/{student_id}"
         if request.method == 'GET':
@@ -181,7 +181,7 @@ def get_student_by_id(student_id):
 # ===========================
 
 @gateway_bp.route('/teachers/create', methods=['POST', 'GET'])
-def create_teacher(current_user=None):
+def create_teacher():
     if request.method == 'POST':
         # Get the form data
         name = request.form["name"]
@@ -206,7 +206,7 @@ def create_teacher(current_user=None):
 
 @gateway_bp.route('/teachers', methods=['GET'])
 @token_required
-def get_teachers():
+def get_teachers(current_user=None):
     try:
         response = requests.get(f"{USER_URL}/teachers")
         teachers = response.json()  # pega o JSON
@@ -217,7 +217,7 @@ def get_teachers():
 
 @gateway_bp.route('/teachers/<int:teacher_id>', methods=['GET', 'PUT', 'DELETE'])
 @token_required
-def handle_teacher(teacher_id):
+def handle_teacher(teacher_id, current_user=None):
     try:
         url = f"{USER_URL}/teachers/{teacher_id}"
         if request.method == 'GET':
@@ -237,7 +237,7 @@ def handle_teacher(teacher_id):
 
 @gateway_bp.route('/sessions/create', methods=['GET', "POST"])
 @token_required
-def create():
+def create(current_user=None):
     if request.method == 'POST':
         try:
             strategy = request.form.get('strategy')
@@ -254,7 +254,7 @@ def create():
 
 @gateway_bp.route('/sessions', methods=['GET'])
 @token_required
-def list_sessions():
+def list_sessions(current_user=None):
     try:
         response = requests.get(f"{CONTROL_URL}/sessions")
         if response.status_code == 200:
@@ -268,7 +268,7 @@ def list_sessions():
 
 @gateway_bp.route('/sessions/status/<int:session_id>', methods=['GET'])
 @token_required
-def get_session_status(session_id):
+def get_session_status(session_id, current_user=None):
     try:
         response = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}")
         return (response.text, response.status_code, response.headers.items())
@@ -278,7 +278,7 @@ def get_session_status(session_id):
 
 @gateway_bp.route('/sessions/start/<int:session_id>', methods=['POST'])
 @token_required
-def start_session(session_id):
+def start_session(session_id, current_user=None):
     try:
         response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
         return (response.text, response.status_code, response.headers.items())
@@ -288,7 +288,7 @@ def start_session(session_id):
 
 @gateway_bp.route('/sessions/end/<int:session_id>', methods=['POST'])
 @token_required
-def end_session(session_id):
+def end_session(session_id, current_user=None):
     try:
         response = requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
         return (response.text, response.status_code, response.headers.items())
