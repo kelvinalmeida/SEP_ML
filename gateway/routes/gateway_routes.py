@@ -161,14 +161,16 @@ def create_strategy():
     return render_template("./strategies/create_strategy.html")
 
 
+
 @gateway_bp.route('/strategies', methods=['GET'])
 def get_strategies(current_user=None):
     try:
         response = requests.get(f"{STRATEGIES_URL}/strategies")
         strategies = response.json()  # pega o JSON
-        return strategies
+        return render_template('./strategies/list_strategies.html', strategies=strategies)
     except RequestException as e:
         return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503
+
     
 
 
