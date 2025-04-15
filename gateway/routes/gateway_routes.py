@@ -9,8 +9,12 @@ gateway_bp = Blueprint('gateway_bp', __name__)
 
 USER_URL = 'http://user:5002'
 CONTROL_URL = 'http://controller:5001'
+STRATEGIES_URL = 'http://strategies:5003'
+
+# Para testes locais, descomente as linhas abaixo e comente as de cima
 # USER_URL = 'http://localhost:5002'
 # CONTROL_URL = 'http://localhost:5001'
+# STRATEGIES_URL = 'http://localhost:5003'
 
 SECRET_KEY = "sua_chave_super_secreta"
 
@@ -27,6 +31,7 @@ SECRET_KEY = "sua_chave_super_secreta"
 #             current_user = None
 
 #     return dict(current_user=current_user)
+
 
 
 def verificar_cookie():
@@ -121,6 +126,50 @@ def perfil(current_user=None):
     response = requests.get(url)
     user = response.json()
     return render_template('perfil.html', user=user)
+
+
+# ===========================
+# 👨‍🎓 STRATEGIES ENDPOINTS
+# ===========================
+
+@gateway_bp.route('/strategies/create', methods=['POST', 'GET'])
+def create_strategy():
+    if request.method == 'POST':
+        # Get the form data
+        name = request.form.get("name")
+        tatics = request.form.getlist("tatics")
+        times = request.form.getlist("times")
+
+        # Junta tática + tempo
+        tatics_with_times = [
+            {"name": tatics[i], "time": int(times[i])}
+            for i in range(len(tatics))
+        ]
+
+        strategy = {"name": name, "tatics": tatics_with_times}
+        
+        try:
+            response = requests.post(f"{STRATEGIES_URL}/strategies/create", json=strategy)
+            if response.status_code == 200:
+                json_response = response.json()
+                return jsonify(json_response), 200
+            else:
+                return jsonify({"error": "Failed to create strategy", "details": response.text}), response.status_code
+        except RequestException as e:
+            return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503
+    
+    return render_template("./strategies/create_strategy.html")
+
+
+@gateway_bp.route('/strategies', methods=['GET'])
+def get_strategies(current_user=None):
+    try:
+        response = requests.get(f"{STRATEGIES_URL}/strategies")
+        strategies = response.json()  # pega o JSON
+        return strategies
+    except RequestException as e:
+        return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503
+    
 
 
 # ===========================

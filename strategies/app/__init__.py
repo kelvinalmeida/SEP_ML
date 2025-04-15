@@ -12,12 +12,12 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///../instance/sessions.db"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    from app.routes.strategies_routes import strategies_bp
+    # Registrar o blueprint
+    app.register_blueprint(strategies_bp)
+
     # Inicializar extensões
     db.init_app(app)
     migrate.init_app(app, db)
-
-    # Registrar blueprints
-    from app.routes.session_routes import session_bp
-    app.register_blueprint(session_bp)
 
     return app
