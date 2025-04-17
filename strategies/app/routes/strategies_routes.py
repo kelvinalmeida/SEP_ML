@@ -32,7 +32,7 @@ def create_strategy():
 @strategies_bp.route('/strategies', methods=['GET'])
 def list_strategies():
     all_strategies = Strategies.query.all()
-    return jsonify([{"name": s.name, "students": s.students, "teachers": s.teachers, "tatics": s.tatics} for s in all_strategies]), 200
+    return jsonify([{"id": s.id, "name": s.name, "tatics": s.tatics} for s in all_strategies]), 200
 
 # @strategies_bp.route('/strategies/status/<int:session_id>', methods=['GET'])
 # def get_session_status(session_id):

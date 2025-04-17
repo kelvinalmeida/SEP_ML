@@ -296,37 +296,67 @@ def handle_teacher(teacher_id, current_user=None):
 def create_session(current_user=None):
     if request.method == 'POST':
         try:
-            strategy = request.form.get('strategy')
-            response = requests.post(f"{CONTROL_URL}/sessions/create", json={"strategy": strategy})
+            strategy_ids = request.form.getlist('strategies')  # agora é uma lista
+            teacher_ids = request.form.getlist('teachers')
+            student_ids = request.form.getlist('students')
+
+            data = {
+                "strategies": strategy_ids,
+                "teachers": teacher_ids,
+                "students": student_ids
+            }
+
+            response = requests.post(f"{CONTROL_URL}/sessions/create", json=data)
+
             if response.status_code == 200:
-                sessions = response.json()  # pega o JSON
-                return jsonify(sessions), 200
+                return redirect(url_for('gateway_bp.home_page'))  # ou qualquer outra página
             else:
-                return f"Erro ao buscar sessões: {response.status_code}", response.status_code
+                return f"Erro ao criar sessão: {response.status_code}", response.status_code
         except RequestException as e:
             return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
     else:
         strategies = requests.get(f"{STRATEGIES_URL}/strategies").json()
         teachers = requests.get(f"{USER_URL}/teachers").json()
         students = requests.get(f"{USER_URL}/students").json()
-        # return jsonify(strategies=strategies, teachers=teachers, students=students) # retorna o JSON para o frontend
 
+        return render_template("control/create_session.html", strategies=strategies, teachers=teachers, students=students)
 
-
-        return render_template("./control/create_session.html", strategies=strategies, teachers=teachers, students=students)
 
 @gateway_bp.route('/sessions', methods=['GET'])
 @token_required
 def list_sessions(current_user=None):
     try:
+        # Busca todas as sessões no microserviço control
         response = requests.get(f"{CONTROL_URL}/sessions")
-        if response.status_code == 200:
-            sessions = response.json()  # pega o JSON
-            return render_template("./control/list_all_sessions.html", sessions=sessions)
-        else:
+        if response.status_code != 200:
             return f"Erro ao buscar sessões: {response.status_code}", response.status_code
+
+        sessions = response.json()
+
+        # return sessions
+
+        # Busca nomes de estratégias, professores e estudantes
+        strategies_data = requests.get(f"{STRATEGIES_URL}/strategies").json()
+        teachers_data = requests.get(f"{USER_URL}/teachers").json()
+        students_data = requests.get(f"{USER_URL}/students").json()
+
+        # Cria dicionários para mapear IDs para nomes
+        strategy_map = {str(item["id"]): item["name"] for item in strategies_data}
+        teacher_map = {str(item["id"]): item["name"] for item in teachers_data}
+        student_map = {str(item["id"]): item["name"] for item in students_data}
+
+        # Substitui os IDs por nomes nas sessões
+        for session in sessions:
+            session["strategies"] = [strategy_map.get(str(sid), f"ID {sid}") for sid in session.get("strategies", [])]
+            session["teachers"] = [teacher_map.get(str(tid), f"ID {tid}") for tid in session.get("teachers", [])]
+            session["students"] = [student_map.get(str(sid), f"ID {sid}") for sid in session.get("students", [])]
+
+
+        return render_template("control/list_all_sessions.html", sessions=sessions)
+
     except RequestException as e:
-        return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
+        return jsonify({"error": "Service unavailable", "details": str(e)}), 503
+
 
 
 @gateway_bp.route('/sessions/status/<int:session_id>', methods=['GET'])

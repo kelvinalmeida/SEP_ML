@@ -10,21 +10,32 @@ def create_tables():
 
 @session_bp.route('/sessions/create', methods=['POST'])
 def create_session():
-    strategy = request.json.get('strategy')
-   
-    if not strategy:
-        return jsonify({"error": "Strategy not provided"}), 400
-   
-    new_session = Session(status='aguardando', strategy=strategy)
+    data = request.get_json()
+    strategies = data.get('strategies', [])
+    teachers = data.get('teachers', [])
+    students = data.get('students', [])
+
+    if not strategies:
+        return jsonify({"error": "Strategies not provided"}), 400
+
+    new_session = Session(
+        status='aguardando',
+        strategies=strategies,
+        teachers=teachers,
+        students=students
+    )
+
     db.session.add(new_session)
     db.session.commit()
+
     return jsonify({"success": "Session created!"}), 200
+
 
 
 @session_bp.route('/sessions', methods=['GET'])
 def list_sessions():
     all_sessions = Session.query.all()
-    return jsonify([{"id": s.id, "status": s.status, "strategy": s.strategy} for s in all_sessions])
+    return jsonify([{"id": s.id, "status": s.status, "strategies": s.strategies, "teachers": s.teachers, "students": s.students} for s in all_sessions])
 
 @session_bp.route('/sessions/status/<int:session_id>', methods=['GET'])
 def get_session_status(session_id):
