@@ -28,6 +28,8 @@
                         {{ tatic }}
                         {% else %}
                         {{ tatic.name }}
+                        <span class="badge bg-primary rounded-pill">{{ tatic.description }}</span>
+
                         <span class="badge bg-primary rounded-pill">{{ tatic.time }} min</span>
                         {% endif %}
                     </li>

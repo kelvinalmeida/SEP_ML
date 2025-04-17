@@ -60,17 +60,6 @@
             border-radius: 8px;
             background-color: #f8f9fa;
         }
-
-        .tactic-name {
-            background-color: #f8f9fa;
-            border: 1px solid red;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-weight: 500;
-            width: fit-content;
-            max-width: 100%;
-            white-space: nowrap;
-        }
     </style>
 </head>
 
@@ -103,7 +92,7 @@
                 <!-- Área para arrastar -->
                 <div class="mb-3">
                     <label class="form-label">Táticas Escolhidas + Tempo (min)</label>
-                    <div id="dropzone" class="dropzone"></div>
+                    <div id="dropzone" class="dropzone tactic-name"></div>
                 </div>
 
                 <!-- Botão -->
@@ -146,6 +135,7 @@
 
 
 
+        <!-- trecho atualizado da função addTacticToDropzone -->
         function addTacticToDropzone(tacticName) {
             const wrapper = document.createElement('div');
             wrapper.classList.add('input-group', 'mb-2', 'sortable-item');
@@ -171,6 +161,13 @@
             inputTime.placeholder = 'Tempo (min)';
             inputTime.required = true;
 
+            const inputDescription = document.createElement('input');
+            inputDescription.type = 'text';
+            inputDescription.name = 'description';
+            inputDescription.className = 'form-control';
+            inputDescription.placeholder = 'Descrição';
+            inputDescription.required = true;
+
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
             deleteBtn.className = 'btn btn-outline-danger';
@@ -184,12 +181,14 @@
             wrapper.appendChild(inputHidden);
             wrapper.appendChild(tacticText);
             wrapper.appendChild(inputTime);
+            wrapper.appendChild(inputDescription);
             wrapper.appendChild(deleteBtn);
             dropzone.appendChild(wrapper);
 
             enableDragAndDrop();
             updateOrderNumbers();
         }
+
 
         function updateOrderNumbers() {
             const items = dropzone.querySelectorAll('.sortable-item');

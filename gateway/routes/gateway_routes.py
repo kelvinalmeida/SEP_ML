@@ -139,10 +139,11 @@ def create_strategy():
         name = request.form.get("name")
         tatics = request.form.getlist("tatics")
         times = request.form.getlist("times")
+        description = request.form.getlist("description")
 
         # Junta tática + tempo
         tatics_with_times = [
-            {"name": tatics[i], "time": int(times[i])}
+            {"name": tatics[i], "time": int(times[i]), "description": description[i]}
             for i in range(len(tatics))
         ]
 
@@ -292,7 +293,7 @@ def handle_teacher(teacher_id, current_user=None):
 
 @gateway_bp.route('/sessions/create', methods=['GET', "POST"])
 @token_required
-def create(current_user=None):
+def create_session(current_user=None):
     if request.method == 'POST':
         try:
             strategy = request.form.get('strategy')
@@ -305,7 +306,14 @@ def create(current_user=None):
         except RequestException as e:
             return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
     else:
-        return render_template("./control/create_session.html")
+        strategies = requests.get(f"{STRATEGIES_URL}/strategies").json()
+        teachers = requests.get(f"{USER_URL}/teachers").json()
+        students = requests.get(f"{USER_URL}/students").json()
+        # return jsonify(strategies=strategies, teachers=teachers, students=students) # retorna o JSON para o frontend
+
+
+
+        return render_template("./control/create_session.html", strategies=strategies, teachers=teachers, students=students)
 
 @gateway_bp.route('/sessions', methods=['GET'])
 @token_required
