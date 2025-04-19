@@ -37,6 +37,14 @@ def list_sessions():
     all_sessions = Session.query.all()
     return jsonify([{"id": s.id, "status": s.status, "strategies": s.strategies, "teachers": s.teachers, "students": s.students} for s in all_sessions])
 
+
+@session_bp.route('/sessions/<int:session_id>', methods=['GET'])
+def get_session_by_id(session_id):
+    session = Session.query.get(session_id)
+    if session:
+        return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students})
+    return jsonify({"error": "Session not found"}), 404
+
 @session_bp.route('/sessions/status/<int:session_id>', methods=['GET'])
 def get_session_status(session_id):
     session = Session.query.get(session_id)
