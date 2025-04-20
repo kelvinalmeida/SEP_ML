@@ -29,11 +29,36 @@
 
                 <hr>
 
-                <div class="mb-3">
-                    <h6>Strategies</h6>
+                <div class="mb-4">
+                    <h5 class="text-decoration-underline">Strategies & Tactics</h5>
                     {% if session.strategies %}
                     {% for strategy in session.strategies %}
-                    <span class="badge bg-info text-dark me-1">{{ strategy }}</span>
+                    <div class="mb-4">
+                        <h6 class="text-primary">{{ strategy.name }}</h6>
+
+                        {% if strategy.tatics %}
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Taticas</th>
+                                    <th>Time (min)</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tatic in strategy.tatics %}
+                                <tr>
+                                    <td>{{ tatic.name }}</td>
+                                    <td>{{ tatic.time }}</td>
+                                    <td>{{ tatic.description or '—' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted"><em>No tactics for this strategy.</em></p>
+                        {% endif %}
+                    </div>
                     {% endfor %}
                     {% else %}
                     <em>No strategies assigned.</em>
@@ -41,7 +66,7 @@
                 </div>
 
                 <div class="mb-3">
-                    <h6>Teachers</h6>
+                    <h5 class="text-decoration-underline">Teachers</h5>
                     {% if session.teachers %}
                     {% for teacher in session.teachers %}
                     <span class="badge bg-success me-1">{{ teacher }}</span>
@@ -52,7 +77,7 @@
                 </div>
 
                 <div class="mb-3">
-                    <h6>Students</h6>
+                    <h5 class="text-decoration-underline">Students</h5>
                     {% if session.students %}
                     {% for student in session.students %}
                     <span class="badge bg-secondary me-1">{{ student }}</span>

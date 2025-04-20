@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from app.models import Strategies
+from app.models import Strategies, Tatics
 from app import db
 
 
@@ -23,7 +23,10 @@ def create_strategy():
     name = request.json.get('name')
     tatics = request.json.get('tatics')
 
-    new_strategy = Strategies(name=name, tatics=tatics)
+    tatatics = [ Tatics(description=tatic["description"], name=tatic["name"], time=tatic["time"]) for tatic in tatics]
+
+
+    new_strategy = Strategies(name=name, tatics=tatatics)
     db.session.add(new_strategy)
     db.session.commit()
     return jsonify({"success": "Strategie created!"}), 200
@@ -32,7 +35,7 @@ def create_strategy():
 @strategies_bp.route('/strategies', methods=['GET'])
 def list_strategies():
     all_strategies = Strategies.query.all()
-    return jsonify([{"id": s.id, "name": s.name, "tatics": s.tatics} for s in all_strategies]), 200
+    return jsonify([{"id": s.id, "name": s.name, "tatics": [t.as_dict() for t in s.tatics]} for s in all_strategies]), 200
 
 # @strategies_bp.route('/strategies/status/<int:session_id>', methods=['GET'])
 # def get_session_status(session_id):
