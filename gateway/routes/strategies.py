@@ -45,3 +45,15 @@ def get_strategies(current_user=None):
         return render_template('./strategies/list_strategies.html', strategies=strategies)
     except RequestException as e:
         return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503
+    
+
+@strategy_bp.route('/strategies/time/<int:strategy_id>', methods=['GET'])
+def get_strategy_time(strategy_id):
+    try:
+        response = requests.get(f"{STRATEGIES_URL}/strategies/time/{strategy_id}")
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        else:
+            return jsonify({"error": "Failed to get strategy time", "details": response.text}), response.status_code
+    except RequestException as e:
+        return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503

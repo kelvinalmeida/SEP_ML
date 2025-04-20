@@ -45,6 +45,15 @@ def get_session_by_id(session_id):
         return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students})
     return jsonify({"error": "Session not found"}), 404
 
+@session_bp.route('/sessions/delete/<int:session_id>', methods=['DELETE'])
+def delete_session(session_id):
+    session = Session.query.get(session_id)
+    if session:
+        db.session.delete(session)
+        db.session.commit()
+        return jsonify({"success": "Session deleted!"}), 200
+    return jsonify({"error": "Session not found"}), 404
+
 @session_bp.route('/sessions/status/<int:session_id>', methods=['GET'])
 def get_session_status(session_id):
     session = Session.query.get(session_id)

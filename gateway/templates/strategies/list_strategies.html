@@ -10,27 +10,34 @@
 <body class="bg-light">
 
     <div class="container my-5">
-        <h2 class="mb-4">Lista de Estratégias</h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Lista de Estratégias</h2>
+            <a href="/" class="btn btn-outline-secondary">← Voltar</a>
+        </div>
 
         {% for strategy in strategies %}
         <div class="card mb-4 shadow-sm">
             <div class="card-body">
-                <h5 class="card-title">
+                <h5 class="card-title mb-3">
                     Estratégia: <strong>{{ strategy.name }}</strong>
                 </h5>
-                <p class="card-subtitle text-muted mb-2">Táticas:</p>
+
+                <h6 class="card-subtitle text-muted mb-2">Táticas:</h6>
 
                 <ul class="list-group list-group-flush">
                     {% if strategy.tatics %}
                     {% for tatic in strategy.tatics %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <li class="list-group-item">
                         {% if tatic is string %}
                         {{ tatic }}
                         {% else %}
-                        {{ tatic.name }}
-                        <span class="badge bg-primary rounded-pill">{{ tatic.description }}</span>
-
-                        <span class="badge bg-primary rounded-pill">{{ tatic.time }} min</span>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap">
+                            <div>
+                                <strong>{{ tatic.name }}</strong>
+                                <div class="text-muted small">{{ tatic.description }}</div>
+                            </div>
+                            <span class="badge bg-primary rounded-pill ms-3 mt-2 mt-sm-0">{{ tatic.time }} min</span>
+                        </div>
                         {% endif %}
                     </li>
                     {% endfor %}

@@ -41,6 +41,7 @@ def create_session(current_user=None):
 @session_bp.route('/sessions', methods=['GET'])
 @token_required
 def list_sessions(current_user=None):
+    # return current_user
     try:
         # Busca todas as sessões
         response = requests.get(f"{CONTROL_URL}/sessions")
@@ -73,9 +74,9 @@ def list_sessions(current_user=None):
                 for sid in session.get("students", [])
             ]
 
-        # return sessions
-
-        return render_template("control/list_all_sessions.html", sessions=sessions)
+        
+        
+        return render_template("control/list_all_sessions.html", sessions=sessions, current_user=current_user)
 
     except RequestException as e:
         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
@@ -130,6 +131,18 @@ def get_session_by_id(session_id, current_user=None):
     except RequestException as e:
         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
 
+
+@session_bp.route('/sessions/delete/<int:session_id>', methods=['POST'])
+@token_required
+def delete_session(session_id, current_user=None):
+    if request.form.get('_method') == 'DELETE':
+        # Lógica para deletar a sessão
+        response = requests.delete(f"{CONTROL_URL}/sessions/delete/{session_id}")
+        if response.status_code == 200:
+            return redirect(url_for('session.list_sessions'))
+        else:
+            return f"Erro ao deletar: {response.text}", response.status_code
+        
 
 @session_bp.route('/sessions/status/<int:session_id>', methods=['GET'])
 @token_required
