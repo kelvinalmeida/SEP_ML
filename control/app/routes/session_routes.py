@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from app.models import Session
 from app import db
+from datetime import datetime
 
 session_bp = Blueprint('session_bp', __name__)
 
@@ -37,13 +38,13 @@ def list_sessions():
     all_sessions = Session.query.all()
     return jsonify([{"id": s.id, "status": s.status, "strategies": s.strategies, "teachers": s.teachers, "students": s.students} for s in all_sessions])
 
-
 @session_bp.route('/sessions/<int:session_id>', methods=['GET'])
 def get_session_by_id(session_id):
     session = Session.query.get(session_id)
     if session:
-        return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students})
+        return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students, "start_time": session.start_time}), 200
     return jsonify({"error": "Session not found"}), 404
+    
 
 @session_bp.route('/sessions/delete/<int:session_id>', methods=['DELETE'])
 def delete_session(session_id):
@@ -61,14 +62,17 @@ def get_session_status(session_id):
         return jsonify({"session_id": session.id, "status": session.status})
     return jsonify({"error": "Session not found"}), 404
 
+
 @session_bp.route('/sessions/start/<int:session_id>', methods=['POST'])
 def start_session(session_id):
     session = Session.query.get(session_id)
     if session:
         session.status = 'in-progress'
+        session.start_time = datetime.utcnow()
         db.session.commit()
-        return jsonify({"session_id": session.id, "status": session.status})
+        return jsonify({"session_id": session.id, "status": session.status, "start_time": session.start_time.isoformat()})
     return jsonify({"error": "Session not found"}), 404
+
 
 @session_bp.route('/sessions/end/<int:session_id>', methods=['POST'])
 def end_session(session_id):
@@ -78,3 +82,5 @@ def end_session(session_id):
         db.session.commit()
         return jsonify({"session_id": session.id, "message": "Session ended!"})
     return jsonify({"error": "Session not found"}), 404
+
+

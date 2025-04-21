@@ -36,37 +36,22 @@ def create_strategy():
 def list_strategies():
     all_strategies = Strategies.query.all()
     return jsonify([{"id": s.id, "name": s.name, "tatics": [t.as_dict() for t in s.tatics]} for s in all_strategies]), 200
+@strategies_bp.route('/strategies', methods=['GET'])
+
+@strategies_bp.route('/strategies/<int:strategy_id>', methods=['GET'])
+def strategy_by_id(strategy_id):
+    strategy = Strategies.query.get(strategy_id)
+    if strategy:
+        return jsonify({"id": strategy.id, "name": strategy.name, "tatics": [t.as_dict() for t in strategy.tatics]}), 200
+    return jsonify({"error": "Strategy not found"}), 404
 
 
 @strategies_bp.route('/strategies/time/<int:strategy_id>', methods=['GET'])
-def get_strategy_time(strategy_id):
+def get_strategy_by_id(strategy_id):
     strategy = Strategies.query.get(strategy_id)
     if strategy:
-        total_time = sum(tatic.time for tatic in strategy.tatics)
-        return jsonify({"strategy_id": strategy.id, "total_time": total_time}), 200
+        return jsonify({"id": strategy.id, "name": strategy.name, "tatics": [t.as_dict() for t in strategy.tatics]}), 200
     return jsonify({"error": "Strategy not found"}), 404
 
-# @strategies_bp.route('/strategies/status/<int:session_id>', methods=['GET'])
-# def get_session_status(session_id):
-#     session = Session.query.get(session_id)
-#     if session:
-#         return jsonify({"session_id": session.id, "status": session.status})
-#     return jsonify({"error": "Session not found"}), 404
 
-# @strategies_bp.route('/strategies/start/<int:session_id>', methods=['POST'])
-# def start_session(session_id):
-#     session = Session.query.get(session_id)
-#     if session:
-#         session.status = 'in-progress'
-#         db.session.commit()
-#         return jsonify({"session_id": session.id, "status": session.status})
-#     return jsonify({"error": "Session not found"}), 404
 
-# @strategies_bp.route('/strategies/end/<int:session_id>', methods=['POST'])
-# def end_session(session_id):
-#     session = Session.query.get(session_id)
-#     if session:
-#         session.status = 'finished'
-#         db.session.commit()
-#         return jsonify({"session_id": session.id, "message": "Session ended!"})
-#     return jsonify({"error": "Session not found"}), 404

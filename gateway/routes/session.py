@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, jsonif
 from requests.exceptions import RequestException
 import requests
 from .auth import token_required
+from datetime import datetime
 from .services_routs import CONTROL_URL, STRATEGIES_URL, USER_URL
 
 session_bp = Blueprint("session", __name__)
@@ -84,9 +85,14 @@ def list_sessions(current_user=None):
 
 
 
-@session_bp.route('/sessions/<int:session_id>', methods=['GET'])
+@session_bp.route('/sessions/<int:session_id>', methods=['GET', 'POST'])
 @token_required
 def get_session_by_id(session_id, current_user=None):
+
+    if request.method == 'POST':
+        response = requests.delete(f"{CONTROL_URL}/sessions/start/{session_id}")
+        return (response.text, response.status_code, response.headers.items())
+
     try:
         # Busca sessão específica no microserviço control
         response = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
@@ -116,6 +122,14 @@ def get_session_by_id(session_id, current_user=None):
             for sid in session.get("strategies", [])
         ]
 
+        full_tactics_time = 0
+        for strategy in session["strategies"]:
+            for tactic in strategy["tatics"]:
+                # Adiciona o tempo de cada tática ao tempo total
+                full_tactics_time += tactic.get("time", 0)
+
+        session["full_tatics_time"] = full_tactics_time # Adiciona o tempo total de táticas à sessão
+
         # Busca nomes de professores e estudantes
         teachers_data = requests.get(f"{USER_URL}/teachers").json()
         students_data = requests.get(f"{USER_URL}/students").json()
@@ -126,7 +140,7 @@ def get_session_by_id(session_id, current_user=None):
         session["teachers"] = [teacher_map.get(str(tid), f"ID {tid}") for tid in session.get("teachers", [])]
         session["students"] = [student_map.get(str(sid), f"ID {sid}") for sid in session.get("students", [])]
 
-        return render_template("control/show_session.html", session=session)
+        return render_template("control/show_session.html", session=session, current_user=current_user)
 
     except RequestException as e:
         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
@@ -154,18 +168,21 @@ def get_session_status(session_id, current_user=None):
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
 
-@session_bp.route('/sessions/start/<int:session_id>', methods=['POST'])
+@session_bp.route('/sessions/start/<int:session_id>', methods=['GET'])
 @token_required
 def start_session(session_id, current_user=None):
     try:
-        # return "oi"
+        session_status = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}").json()
+        if(session_status["status"] == "in-progress"):
+            return jsonify({"error": "Session already in progress"}), 400
+        
         response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
         return (response.text, response.status_code, response.headers.items())
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
 
-@session_bp.route('/sessions/end/<int:session_id>', methods=['POST'])
+@session_bp.route('/sessions/end/<int:session_id>', methods=['GET'])
 @token_required
 def end_session(session_id, current_user=None):
     try:
@@ -173,3 +190,63 @@ def end_session(session_id, current_user=None):
         return (response.text, response.status_code, response.headers.items())
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
+    
+
+
+@session_bp.route('/sessions/<int:session_id>/current_tactic', methods=['GET'])
+def get_current_tactic(session_id):
+    # Buscar a sessão
+    session_response = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
+    # return (session_response.text, session_response.status_code, session_response.headers.items())
+
+    if session_response.status_code != 200:
+        return jsonify({'error': 'Session not found'}), 404
+
+    session_json = session_response.json()
+
+    if session_json['status'] != 'in-progress' or not session_json.get("start_time"):
+        return jsonify({'message': 'Session not started'}), 400
+
+    # Converter start_time para datetime (assumindo formato ISO 8601)
+    start_time = datetime.strptime(session_json["start_time"], "%a, %d %b %Y %H:%M:%S %Z")
+    elapsed_time = (datetime.utcnow() - start_time).total_seconds()
+    elapsed_minutes = elapsed_time / 60
+
+    tactics = []
+    for strategy_id in session_json['strategies']:
+        strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
+        # return f"{strategy_response.text}"
+        if strategy_response.status_code != 200:
+            continue
+
+        strategy_data = strategy_response.json()
+        strategy_tactics = strategy_data.get('tatics', [])
+        tactics.extend(strategy_tactics)
+
+    # return f"{tactics}"
+
+    total_elapsed = 0
+    for tactic in tactics:
+        duration = tactic.get('time', 0)
+        if elapsed_minutes < total_elapsed + duration:
+            remaining = (total_elapsed + duration - elapsed_minutes) * 60
+            return jsonify({
+                'tactic': {
+                    'name': tactic['name'],
+                    'description': tactic.get('description', ''),
+                    'total_time': duration * 60
+                },
+                'remaining_time': int(remaining),
+                'elapsed_time': int(elapsed_time)
+            })
+
+        total_elapsed += duration
+
+    
+    # Se todas as táticas foram concluídas, finalizar a sessão
+    requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
+
+    # return f"{session_response.text}"
+
+    return jsonify({'message': 'All tactics completed'})
+

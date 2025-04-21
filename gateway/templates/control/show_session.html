@@ -5,6 +5,26 @@
     <meta charset="UTF-8">
     <title>Session Details</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #tacticTimer {
+            font-size: 3rem;
+            padding: 1rem 2rem;
+        }
+
+        #tacticName {
+            font-size: 1.5rem;
+        }
+
+        .centered-controls {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .badge-large {
+            font-size: 1.2rem;
+            padding: 0.6rem 1rem;
+        }
+    </style>
 </head>
 
 <body class="bg-light">
@@ -14,33 +34,57 @@
                 <h4 class="mb-0">Session #{{ session.id }}</h4>
             </div>
             <div class="card-body">
-                <h5 class="card-title">Status:
-                    <span class="badge 
-                        {% if session.status == 'active' %}
+                <h5 class="card-title">
+                    Status:
+                    <span class="badge
+                        {% if session.status == 'in-progress' %}
                             bg-success
-                        {% elif session.status == 'pending' %}
+                        {% elif session.status == 'finished' %}
                             bg-warning text-dark
                         {% else %}
                             bg-secondary
                         {% endif %}">
                         {{ session.status.capitalize() }}
                     </span>
+                    <span class="badge bg-warning badge-large">
+                        Tempo de Aula {{ session.full_tatics_time }} min
+                    </span>
                 </h5>
+
+                <!-- Botão e cronômetro centralizados -->
+                <div class="centered-controls">
+
+                    <button id="endSessionBtn" class="btn 
+                    {% if current_user.type != 'teacher'%}
+                        d-none
+                    {% endif %}
+                    btn-danger btn-lg mb-3">Encerrar Sessão</button>
+                    <button id="startSessionBtn" class="btn 
+                    {% if current_user.type != 'teacher'%}
+                        d-none
+                    {% endif %}
+                    btn-success btn-lg mb-3">Iniciar Sessão</button>
+
+                    <div>
+                        <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
+                        <div id="tacticTimer" class="badge bg-dark">--</div>
+                    </div>
+                </div>
 
                 <hr>
 
+                <!-- Estratégias -->
                 <div class="mb-4">
                     <h5 class="text-decoration-underline">Strategies & Tactics</h5>
                     {% if session.strategies %}
                     {% for strategy in session.strategies %}
                     <div class="mb-4">
                         <h6 class="text-primary">{{ strategy.name }}</h6>
-
                         {% if strategy.tatics %}
                         <table class="table table-bordered table-sm">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Taticas</th>
+                                    <th>Táticas</th>
                                     <th>Time (min)</th>
                                     <th>Description</th>
                                 </tr>
@@ -65,6 +109,7 @@
                     {% endif %}
                 </div>
 
+                <!-- Professores -->
                 <div class="mb-3">
                     <h5 class="text-decoration-underline">Teachers</h5>
                     {% if session.teachers %}
@@ -76,6 +121,7 @@
                     {% endif %}
                 </div>
 
+                <!-- Alunos -->
                 <div class="mb-3">
                     <h5 class="text-decoration-underline">Students</h5>
                     {% if session.students %}
@@ -91,6 +137,63 @@
             </div>
         </div>
     </div>
+
+    <!-- Script de controle -->
+    <script>
+        let countdownInterval = null;
+
+        function startCountdown(remainingTime) {
+            clearInterval(countdownInterval);
+            let timeLeft = remainingTime;
+
+            countdownInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById("tacticTimer").innerText = "Concluído";
+                    fetchCurrentTactic("{{ session.id }}"); // Pega próxima tática
+                } else {
+                    document.getElementById("tacticTimer").innerText = `${timeLeft}s restantes`;
+                    timeLeft--;
+                }
+            }, 1000);
+        }
+
+        function fetchCurrentTactic(sessionId) {
+            fetch(`/sessions/${sessionId}/current_tactic`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.tactic) {
+                        document.getElementById("tacticName").innerText = data.tactic.name;
+                        startCountdown(data.remaining_time);
+                    } else {
+                        document.getElementById("tacticName").innerText = "Sessão finalizada";
+                        document.getElementById("tacticTimer").innerText = "--";
+                        clearInterval(countdownInterval);
+                    }
+                })
+                .catch(() => {
+                    document.getElementById("tacticName").innerText = "Erro ao carregar";
+                    document.getElementById("tacticTimer").innerText = "--";
+                });
+        }
+
+        // Inicia a sessão ao clicar
+        document.getElementById("startSessionBtn").addEventListener("click", () => {
+            fetch(`/sessions/start/{{ session.id }}`)
+                .then(response => {
+                    if (response.ok) {
+                        fetchCurrentTactic("{{ session.id }}");
+                    } else {
+                        alert("Sessão já iniciada ou erro ao iniciar.");
+                    }
+                });
+        });
+
+        // Verificação periódica de nova tática
+        fetchCurrentTactic("{{ session.id }}");
+        setInterval(() => fetchCurrentTactic("{{ session.id }}"), 15000);
+    </script>
+
 </body>
 
 </html>
