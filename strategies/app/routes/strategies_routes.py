@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from app.models import Strategies, Tatics
-from app import db
+from app.models import Strategies, Tatics, Message
+from app import db, socketio  # importar o socketio criado no __init__.py
+from flask_socketio import send
 
 
 
@@ -36,7 +37,7 @@ def create_strategy():
 def list_strategies():
     all_strategies = Strategies.query.all()
     return jsonify([{"id": s.id, "name": s.name, "tatics": [t.as_dict() for t in s.tatics]} for s in all_strategies]), 200
-@strategies_bp.route('/strategies', methods=['GET'])
+
 
 @strategies_bp.route('/strategies/<int:strategy_id>', methods=['GET'])
 def strategy_by_id(strategy_id):
@@ -54,4 +55,43 @@ def get_strategy_by_id(strategy_id):
     return jsonify({"error": "Strategy not found"}), 404
 
 
+@strategies_bp.route('/chat')
+def chat():
+    # return 'oi'
+    return render_template('chat.html')
 
+@strategies_bp.route('/chat/create', methods=['POST'])
+def create_chat():
+    # Assuming you have a model named Message with the following fields:
+    # id = db.Column(db.Integer, primary_key=True)
+    # messages = db.Column(PickleType, nullable=False, default=[])
+    
+    new_chat = Message()
+    db.session.add(new_chat)
+    db.session.commit()
+    return jsonify({"success": "Chat created!", "id": new_chat.id}), 200
+
+@strategies_bp.route('/chat/show', methods=['GET'])
+def show_chats():
+    all_chats = Message.query.all()
+    return jsonify([{"id": c.id, "messages": c.messages} for c in all_chats]), 200
+
+@socketio.on('message')
+def handle_message(data):
+    id = data.get('id')
+    username = data.get('username')
+    content = data.get('content')
+
+    chat = Message.query.filter_by(id=id).first()
+
+    # print(f'>>>>>>>>>>>>>> {chat.messages}')
+    chat.messages.append({"username": username, "content": content})
+    db.session.commit()
+
+    # enviar para todos os clientes
+    send(chat.as_dict(), broadcast=True)
+
+@socketio.on('load_messages')
+def handle_load_messages():
+    chat = Message.query.filter_by(id=1).first()
+    send(chat.as_dict(), broadcast=True)

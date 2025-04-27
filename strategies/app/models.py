@@ -1,5 +1,7 @@
 from . import db 
 from sqlalchemy.types import PickleType
+from sqlalchemy.ext.mutable import MutableList
+from datetime import datetime
 
 class Strategies(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -21,4 +23,15 @@ class Tatics:
             "description": self.description,
             "time": self.time
         }
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    messages = db.Column(MutableList.as_mutable(PickleType), nullable=False, default=list)
+
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "messages": self.messages
+        }
+
 
