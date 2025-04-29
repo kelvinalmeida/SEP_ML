@@ -45,6 +45,7 @@
 
                 <!-- Botão de Login/Logout -->
                 <div>
+                    <a href="/perfil" class="btn btn-light">Perfil</a>
                     {% if current_user %}
                     <a href="/logout" class="btn btn-outline-light">Logout</a>
                     {% else %}
@@ -58,12 +59,12 @@
                 <a href="/students" class="btn btn-light">Ver Estudantes</a>
                 <a href="/teachers" class="btn btn-light">Ver Professores</a>
                 <a href="/sessions" class="btn btn-light">Ver Sessões</a>
-                <a href="/perfil" class="btn btn-light">Perfil</a>
+
 
                 {% if current_user and current_user.type == 'teacher' %}
                 <a href="/sessions/create" class="btn btn-light">Criar Sessão</a>
-                <a href="/students/create" class="btn btn-light">Criar Aluno</a>
-                <a href="/teachers/create" class="btn btn-light">Criar Professor</a>
+                <a href="/strategies" class="btn btn-light">Ver Strategias</a>
+                <a href="/strategies/create" class="btn btn-light">Criar Strategia</a>
                 {% endif %}
             </div>
         </div>

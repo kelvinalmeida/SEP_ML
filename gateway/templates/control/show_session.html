@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Session Details</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #tacticTimer {
+            font-size: 3rem;
+            padding: 1rem 2rem;
+        }
+
+        #tacticName {
+            font-size: 1.5rem;
+        }
+
+        .centered-controls {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .badge-large {
+            font-size: 1.2rem;
+            padding: 0.6rem 1rem;
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="card shadow-lg">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Session #{{ session.id }}</h4>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">
+                    Status:
+                    <span class="badge
+                        {% if session.status == 'in-progress' %}
+                            bg-success
+                        {% elif session.status == 'finished' %}
+                            bg-warning text-dark
+                        {% else %}
+                            bg-secondary
+                        {% endif %}">
+                        {{ session.status.capitalize() }}
+                    </span>
+                    <span class="badge bg-warning badge-large">
+                        Tempo de Aula {{ session.full_tatics_time }} min
+                    </span>
+                </h5>
+
+                <!-- Botão e cronômetro centralizados -->
+                <div class="centered-controls">
+
+                    <button id="endSessionBtn" class="btn 
+                    {% if current_user.type != 'teacher'%}
+                        d-none
+                    {% endif %}
+                    btn-danger btn-lg mb-3">Encerrar Sessão</button>
+                    <button id="startSessionBtn" class="btn 
+                    {% if current_user.type != 'teacher'%}
+                        d-none
+                    {% endif %}
+                    btn-success btn-lg mb-3">Iniciar Sessão</button>
+
+                    <div>
+                        <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
+                        <div id="tacticTimer" class="badge bg-dark">--</div>
+                        <div id="chat_here"></div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Estratégias -->
+                <div class="mb-4">
+                    <h5 class="text-decoration-underline">Strategies & Tactics</h5>
+                    {% if session.strategies %}
+                    {% for strategy in session.strategies %}
+                    <div class="mb-4">
+                        <h6 class="text-primary">{{ strategy.name }}</h6>
+                        {% if strategy.tatics %}
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Táticas</th>
+                                    <th>Time (min)</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tatic in strategy.tatics %}
+                                <tr>
+                                    <td>{{ tatic.name }}</td>
+                                    <td>{{ tatic.time }}</td>
+                                    <td>{{ tatic.description or '—' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted"><em>No tactics for this strategy.</em></p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <em>No strategies assigned.</em>
+                    {% endif %}
+                </div>
+
+                <!-- Professores -->
+                <div class="mb-3">
+                    <h5 class="text-decoration-underline">Teachers</h5>
+                    {% if session.teachers %}
+                    {% for teacher in session.teachers %}
+                    <span class="badge bg-success me-1">{{ teacher }}</span>
+                    {% endfor %}
+                    {% else %}
+                    <em>No teachers assigned.</em>
+                    {% endif %}
+                </div>
+
+                <!-- Alunos -->
+                <div class="mb-3">
+                    <h5 class="text-decoration-underline">Students</h5>
+                    {% if session.students %}
+                    {% for student in session.students %}
+                    <span class="badge bg-secondary me-1">{{ student }}</span>
+                    {% endfor %}
+                    {% else %}
+                    <em>No students assigned.</em>
+                    {% endif %}
+                </div>
+
+                <a href="/sessions" class="btn btn-outline-primary mt-3">← Back to Sessions</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de controle -->
+    <script>
+        let countdownInterval = null;
+
+        function startCountdown(remainingTime, strategyTactics, tacticName) {
+            clearInterval(countdownInterval);
+            let timeLeft = remainingTime;
+
+            countdownInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById("tacticTimer").innerText = "Concluído";
+                    fetchCurrentTactic("{{ session.id }}"); // Pega próxima tática
+                } else {
+                    document.getElementById("tacticTimer").innerText = `${timeLeft}s restantes`;
+
+                    timeLeft--;
+                    if (tacticName == "Debate Sincrono") {
+                        let chatElement = document.getElementById("chat");
+
+                        // Evitar adicionar o botão várias vezes:
+                        if (!document.getElementById("chat")) {
+
+                            let button = document.createElement("button");
+                            button.id = "chat";
+                            button.innerText = "Entrar no Chat";
+
+                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            id_chat = null;
+                            for (let tatic_stra in strategyTactics) {
+                                // console.log(strategyTactics[tatic_stra].name);
+                                if (strategyTactics[tatic_stra].name == "Debate Sincrono") {
+                                    id_chat = strategyTactics[tatic_stra].chat_id;
+                                    break;
+                                }
+                            }
+
+                            button.onclick = function () {
+                                window.location.href = `/chat/${id_chat}`;
+                            };
+
+                            let chat_here = document.getElementById("chat_here");
+
+                            chat_here.appendChild(button);
+                        }
+
+                    }
+                }
+            }, 1000);
+        }
+
+        function fetchCurrentTactic(sessionId) {
+            fetch(`/sessions/${sessionId}/current_tactic`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.tactic) {
+                        document.getElementById("tacticName").innerText = data.tactic.name;
+                        startCountdown(data.remaining_time, data.strategy_tactics, data.tactic.name);
+                    } else {
+                        document.getElementById("tacticName").innerText = "Sessão finalizada";
+                        document.getElementById("tacticTimer").innerText = "--";
+                        clearInterval(countdownInterval);
+                    }
+                })
+                .catch(() => {
+                    document.getElementById("tacticName").innerText = "Erro ao carregar";
+                    document.getElementById("tacticTimer").innerText = "--";
+                });
+        }
+
+        // Inicia a sessão ao clicar
+        document.getElementById("startSessionBtn").addEventListener("click", () => {
+            fetch(`/sessions/start/{{ session.id }}`)
+                .then(response => {
+                    if (response.ok) {
+                        fetchCurrentTactic("{{ session.id }}");
+                    } else {
+                        alert("Sessão já iniciada ou erro ao iniciar.");
+                    }
+                });
+        });
+
+        // Verificação periódica de nova tática
+        fetchCurrentTactic("{{ session.id }}");
+        setInterval(() => fetchCurrentTactic("{{ session.id }}"), 15000);
+    </script>
+
+</body>
+
+</html>

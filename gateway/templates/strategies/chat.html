@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .chat-container {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-card {
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #messages {
+            list-style-type: none;
+            overflow-y: auto;
+            flex: 1;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 20px;
+            max-width: 70%;
+            word-wrap: break-word;
+            display: inline-block;
+        }
+
+        .my-message {
+            background-color: #cce5ff;
+            align-self: flex-end;
+            text-align: left;
+        }
+
+        .other-message {
+            background-color: #e9ecef;
+            align-self: flex-start;
+            text-align: left;
+        }
+
+        .username {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container chat-container">
+        <div class="card shadow p-4 chat-card">
+            <h1 class="text-center mb-4">Chat Room</h1>
+
+            <ul id="messages" class="d-flex flex-column"></ul>
+
+            <form id="chatForm" class="row g-2">
+                <div class="col-md-4">
+                    <input id="username" class="form-control" placeholder="Seu Nome" autocomplete="off" required>
+                </div>
+                <div class="col-md-6">
+                    <input id="myMessage" class="form-control" placeholder="Type a message..." autocomplete="off"
+                        required>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        var socket = io();
+        var myUsername = '';
+        const strategyId = "{{ strategy_id }}";
+
+        socket.on('connect', function () {
+            console.log('Connected to server');
+            socket.emit('load_messages', { id: strategyId });
+        });
+
+        socket.on('message', function (msg) {
+            console.log(msg);
+
+            const messagesList = document.getElementById('messages');
+            messagesList.innerHTML = '';
+
+            const mensagens = msg['messages'];
+            mensagens.forEach(mensagem => {
+                var item = document.createElement('li');
+
+                var messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+
+                if (mensagem.username === myUsername) {
+                    messageDiv.classList.add('my-message');
+                } else {
+                    messageDiv.classList.add('other-message');
+                }
+
+                const usernameSpan = document.createElement('span');
+                usernameSpan.classList.add('username');
+                usernameSpan.textContent = mensagem.username;
+
+                const contentSpan = document.createElement('span');
+                contentSpan.textContent = mensagem.content;
+
+                messageDiv.appendChild(usernameSpan);
+                messageDiv.appendChild(contentSpan);
+
+                item.appendChild(messageDiv);
+                messagesList.appendChild(item);
+            });
+
+            // Scroll automático para a última mensagem
+            messagesList.scrollTop = messagesList.scrollHeight;
+        });
+
+        document.getElementById('chatForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const usernameInput = document.getElementById("username");
+            const messageInput = document.getElementById("myMessage");
+
+            const username = usernameInput.value.trim();
+            const message = messageInput.value.trim();
+
+            if (username !== "" && message !== "") {
+                myUsername = username; // Guardar o meu username para comparação
+                socket.emit('message', { id: strategyId, username: username, content: message });
+                messageInput.value = "";
+            }
+        });
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

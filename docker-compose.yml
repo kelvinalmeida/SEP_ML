@@ -44,6 +44,20 @@ services:
       - FLASK_APP=app.py
     command: "flask run --host=0.0.0.0"
 
+  strategies:
+    build: ./strategies/
+    container_name: strategies_container
+    working_dir: /app
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./strategies:/app
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - FLASK_APP=app.py
+    command: "flask run --host=0.0.0.0"
+
 # Volumes nomeados (se precisar persistência em banco ou arquivos locais)
 volumes:
   session:
