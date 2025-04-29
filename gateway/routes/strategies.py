@@ -16,6 +16,7 @@ def create_strategy():
         tatics = request.form.getlist("tatics")
         times = request.form.getlist("times")
         description = request.form.getlist("description")
+        # return jsonify(name, tatics, times, description)
 
         # Junta tática + tempo
         tatics_with_times = [

@@ -85,6 +85,7 @@
                         <div class="list-group-item draggable" draggable="true">Envio de Informacao</div>
                         <div class="list-group-item draggable" draggable="true">Mudanca de Estrategia</div>
                         <div class="list-group-item draggable" draggable="true">Relatorio</div>
+                        <div class="list-group-item draggable" draggable="true">Apresentacao Sincrona</div>
                         <div class="list-group-item draggable" draggable="true">Regra</div>
                     </div>
                 </div>
@@ -151,7 +152,7 @@
             inputHidden.value = tacticName;
 
             const tacticText = document.createElement('span');
-            tacticText.className = 'input-group-text flex-grow-1';
+            tacticText.className = 'input-group-text';
             tacticText.textContent = tacticName;
 
             const inputTime = document.createElement('input');
@@ -162,11 +163,17 @@
             inputTime.required = true;
 
             const inputDescription = document.createElement('input');
-            inputDescription.type = 'text';
-            inputDescription.name = 'description';
-            inputDescription.className = 'form-control';
-            inputDescription.placeholder = 'Descrição';
-            inputDescription.required = true;
+            if (tacticName == "Apresentacao Sincrona") {
+                inputDescription.type = 'text';
+                inputDescription.name = 'description';
+                inputDescription.className = 'form-control';
+                inputDescription.placeholder = 'Adicione o link do google Meet ou Zoom';
+                inputDescription.required = true;
+            } else {
+                inputDescription.type = 'hidden';
+                inputDescription.name = 'description';
+                inputDescription.value = 'hidden';
+            }
 
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
@@ -184,6 +191,7 @@
             wrapper.appendChild(inputDescription);
             wrapper.appendChild(deleteBtn);
             dropzone.appendChild(wrapper);
+
 
             enableDragAndDrop();
             updateOrderNumbers();
