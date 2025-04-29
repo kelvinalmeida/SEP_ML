@@ -9,19 +9,21 @@ class Strategies(db.Model):
     tatics = db.Column(PickleType, nullable=False, default=list)  # Melhor prática que usar []
 
 class Tatics:
-    def __init__(self, name, description, time):
+    def __init__(self, name, description, time, chat_id = None):
         self.name = name
         self.description = description
         self.time = time
+        self.chat_id = chat_id
 
     def __repr__(self):
-        return f"<Tatics name={self.name}, description={self.description}, time={self.time}>"
+        return f"<Tatics name={self.name}, description={self.description}, time={self.time}, chat_id={self.chat_id}>"
 
     def as_dict(self):
         return {
             "name": self.name,
             "description": self.description,
-            "time": self.time
+            "time": self.time,
+            "chat_id": self.chat_id if self.chat_id else None 
         }
 
 class Message(db.Model):

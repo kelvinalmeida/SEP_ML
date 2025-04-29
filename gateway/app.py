@@ -1,9 +1,13 @@
 from flask import Flask
+from flask_socketio import SocketIO
+
 # from .routes import register_routes
 
+socketio = SocketIO()
 
 app = Flask(__name__)
 app.secret_key = "sua_chave_super_secreta"
+socketio.init_app(app)
 
 from routes.login import login_bp
 from routes.student import student_bp
@@ -18,5 +22,5 @@ app.register_blueprint(session_bp)
 app.register_blueprint(strategy_bp)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
 

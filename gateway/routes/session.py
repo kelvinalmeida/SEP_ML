@@ -237,7 +237,8 @@ def get_current_tactic(session_id):
                     'total_time': duration * 60
                 },
                 'remaining_time': int(remaining),
-                'elapsed_time': int(elapsed_time)
+                'elapsed_time': int(elapsed_time),
+                'strategy_tactics': tactics
             })
 
         total_elapsed += duration

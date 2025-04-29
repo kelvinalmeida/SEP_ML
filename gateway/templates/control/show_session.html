@@ -68,6 +68,7 @@
                     <div>
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
                         <div id="tacticTimer" class="badge bg-dark">--</div>
+                        <div id="chat_here"></div>
                     </div>
                 </div>
 
@@ -142,7 +143,7 @@
     <script>
         let countdownInterval = null;
 
-        function startCountdown(remainingTime) {
+        function startCountdown(remainingTime, strategyTactics, tacticName) {
             clearInterval(countdownInterval);
             let timeLeft = remainingTime;
 
@@ -153,7 +154,38 @@
                     fetchCurrentTactic("{{ session.id }}"); // Pega próxima tática
                 } else {
                     document.getElementById("tacticTimer").innerText = `${timeLeft}s restantes`;
+
                     timeLeft--;
+                    if (tacticName == "Debate Sincrono") {
+                        let chatElement = document.getElementById("chat");
+
+                        // Evitar adicionar o botão várias vezes:
+                        if (!document.getElementById("chat")) {
+
+                            let button = document.createElement("button");
+                            button.id = "chat";
+                            button.innerText = "Entrar no Chat";
+
+                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            id_chat = null;
+                            for (let tatic_stra in strategyTactics) {
+                                // console.log(strategyTactics[tatic_stra].name);
+                                if (strategyTactics[tatic_stra].name == "Debate Sincrono") {
+                                    id_chat = strategyTactics[tatic_stra].chat_id;
+                                    break;
+                                }
+                            }
+
+                            button.onclick = function () {
+                                window.location.href = `/chat/${id_chat}`;
+                            };
+
+                            let chat_here = document.getElementById("chat_here");
+
+                            chat_here.appendChild(button);
+                        }
+
+                    }
                 }
             }, 1000);
         }
@@ -164,7 +196,7 @@
                 .then(data => {
                     if (data.tactic) {
                         document.getElementById("tacticName").innerText = data.tactic.name;
-                        startCountdown(data.remaining_time);
+                        startCountdown(data.remaining_time, data.strategy_tactics, data.tactic.name);
                     } else {
                         document.getElementById("tacticName").innerText = "Sessão finalizada";
                         document.getElementById("tacticTimer").innerText = "--";

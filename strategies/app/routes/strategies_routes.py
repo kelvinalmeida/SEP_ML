@@ -1,7 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from app.models import Strategies, Tatics, Message
-from app import db, socketio  # importar o socketio criado no __init__.py
-from flask_socketio import send
+from app import db  # importar o socketio criado no __init__.py
 
 
 
@@ -13,18 +12,11 @@ def create_tables():
 
 @strategies_bp.route('/strategies/create', methods=['POST', 'GET'])
 def create_strategy():
-    # Assuming you have a model named Strategies with the following fields:
-    # id = db.Column(db.Integer, primary_key=True)
-    # name = db.Column(db.String(50), nullable=False)
-    # students = db.Column(PickleType, nullable=False, default=[])
-    # teachers = db.Column(PickleType, nullable=False, default=[])
-    # tatics = db.Column(PickleType, nullable=False, default=[])
-    
 
     name = request.json.get('name')
     tatics = request.json.get('tatics')
 
-    tatatics = [ Tatics(description=tatic["description"], name=tatic["name"], time=tatic["time"]) for tatic in tatics]
+    tatatics = [ Tatics(description=tatic["description"], name=tatic["name"], time=tatic["time"], chat_id=tatic["chat_id"]) for tatic in tatics]
 
 
     new_strategy = Strategies(name=name, tatics=tatatics)
@@ -76,22 +68,40 @@ def show_chats():
     all_chats = Message.query.all()
     return jsonify([{"id": c.id, "messages": c.messages} for c in all_chats]), 200
 
-@socketio.on('message')
-def handle_message(data):
-    id = data.get('id')
-    username = data.get('username')
-    content = data.get('content')
+@strategies_bp.route('/chat/<int:chat_id>', methods=['GET'])
+def get_chat(chat_id):
+    chat = Message.query.get(chat_id)
+    if chat:
+        return jsonify(chat.as_dict()), 200
+    return jsonify({"error": "Chat not found"}), 404
 
-    chat = Message.query.filter_by(id=id).first()
+@strategies_bp.route('/chat/<int:chat_id>/add_message', methods=['POST'])
+def add_message(chat_id):
+    chat = Message.query.get(chat_id)
+    if chat:
+        username = request.json.get('username')
+        content = request.json.get('content')
+        chat.messages.append({"username": username, "content": content})
+        db.session.commit()
+        return jsonify(chat.as_dict()), 200
+    return jsonify({"error": "Chat not found"}), 404
 
-    # print(f'>>>>>>>>>>>>>> {chat.messages}')
-    chat.messages.append({"username": username, "content": content})
-    db.session.commit()
+# @socketio.on('message')
+# def handle_message(data):
+#     id = data.get('id')
+#     username = data.get('username')
+#     content = data.get('content')
 
-    # enviar para todos os clientes
-    send(chat.as_dict(), broadcast=True)
+#     chat = Message.query.filter_by(id=id).first()
 
-@socketio.on('load_messages')
-def handle_load_messages():
-    chat = Message.query.filter_by(id=1).first()
-    send(chat.as_dict(), broadcast=True)
+#     # print(f'>>>>>>>>>>>>>> {chat.messages}')
+#     chat.messages.append({"username": username, "content": content})
+#     db.session.commit()
+
+#     # enviar para todos os clientes
+#     send(chat.as_dict(), broadcast=True)
+
+# @socketio.on('load_messages')
+# def handle_load_messages():
+#     chat = Message.query.filter_by(id=1).first()
+#     send(chat.as_dict(), broadcast=True)
