@@ -1,3 +1,8 @@
 flask db init
 flask db migrate -m "Initial migration"
 flask db upgrade
+
+
+
+docker-compose down        # Para todos os containers
+docker-compose up --build  # Sobe novamente e recompila com a porta certa
