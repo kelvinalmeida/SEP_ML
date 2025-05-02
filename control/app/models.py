@@ -8,4 +8,5 @@ class Session(db.Model):
     strategies = db.Column(PickleType, nullable=False, default=[])
     teachers = db.Column(PickleType, nullable=False, default=[])
     students = db.Column(PickleType, nullable=False, default=[])
+    domains = db.Column(PickleType, nullable=False, default=[])
     start_time = db.Column(db.DateTime)  # Novo campo para armazenar o horário de início

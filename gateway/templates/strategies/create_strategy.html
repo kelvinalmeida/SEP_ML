@@ -84,7 +84,6 @@
                         <div class="list-group-item draggable" draggable="true">Debate Sincrono</div>
                         <div class="list-group-item draggable" draggable="true">Envio de Informacao</div>
                         <div class="list-group-item draggable" draggable="true">Mudanca de Estrategia</div>
-                        <div class="list-group-item draggable" draggable="true">Relatorio</div>
                         <div class="list-group-item draggable" draggable="true">Apresentacao Sincrona</div>
                         <div class="list-group-item draggable" draggable="true">Regra</div>
                     </div>
@@ -161,6 +160,9 @@
             inputTime.className = 'form-control';
             inputTime.placeholder = 'Tempo (min)';
             inputTime.required = true;
+            inputTime.min = '0';
+            inputTime.max = '60';
+            inputTime.step = '0.01';
 
             const inputDescription = document.createElement('input');
             if (tacticName == "Apresentacao Sincrona") {

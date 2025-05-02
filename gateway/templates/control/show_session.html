@@ -219,7 +219,48 @@
                             chat_here.appendChild(button);
                         }
                     }
+                    else if (tacticName == "Reuso") {
+                        if (!document.getElementById("chat")) {
+
+                            let button = document.createElement("button");
+                            button.id = "chat";
+                            button.innerText = "Clique para ver o matérial";
+
+                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+
+                            button.onclick = function () {
+                                let domain_id = '{{session.domains[0].id}}';
+                                console.log(domain_id);
+                                let link = `/domains/${domain_id}`;
+                                window.open(link, "_blank");
+                            };
+
+                            let chat_here = document.getElementById("chat_here");
+
+                            chat_here.appendChild(button);
+                        }
+                    }
+                    else if (tacticName == "Envio de Informacao") {
+                        if (!document.getElementById("chat")) {
+
+                            let button = document.createElement("button");
+                            button.id = "chat";
+                            button.innerText = "Agora será enviado um material para o email cadastrado! Por favor, verifique! clique para ir para o email";
+
+                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+
+                            button.onclick = function () {
+                                let link = `https://mail.google.com/`;
+                                window.open(link, "_blank");
+                            };
+
+                            let chat_here = document.getElementById("chat_here");
+
+                            chat_here.appendChild(button);
+                        }
+                    }
                 }
+
             }, 1000);
         }
 

@@ -15,6 +15,7 @@ def create_session():
     strategies = data.get('strategies', [])
     teachers = data.get('teachers', [])
     students = data.get('students', [])
+    domains = data.get('domains', [])
 
     if not strategies:
         return jsonify({"error": "Strategies not provided"}), 400
@@ -23,7 +24,8 @@ def create_session():
         status='aguardando',
         strategies=strategies,
         teachers=teachers,
-        students=students
+        students=students,
+        domains=domains,
     )
 
     db.session.add(new_session)
@@ -36,13 +38,13 @@ def create_session():
 @session_bp.route('/sessions', methods=['GET'])
 def list_sessions():
     all_sessions = Session.query.all()
-    return jsonify([{"id": s.id, "status": s.status, "strategies": s.strategies, "teachers": s.teachers, "students": s.students} for s in all_sessions])
+    return jsonify([{"id": s.id, "status": s.status, "strategies": s.strategies, "teachers": s.teachers, "students": s.students, "domains": s.domains} for s in all_sessions])
 
 @session_bp.route('/sessions/<int:session_id>', methods=['GET'])
 def get_session_by_id(session_id):
     session = Session.query.get(session_id)
     if session:
-        return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students, "start_time": session.start_time}), 200
+        return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students,  "domains": session.domains,  "start_time": session.start_time}), 200
     return jsonify({"error": "Session not found"}), 404
     
 

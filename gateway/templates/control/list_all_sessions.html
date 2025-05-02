@@ -30,10 +30,24 @@
                         <p><strong>Strategies:</strong></p>
                         {% if session.strategies %}
                         {% for strategy in session.strategies %}
-                        <span class="badge bg-primary me-1">{{ strategy }}</span>
+                        <span class="badge bg-primary me-1 text-wrap" style="max-width: 100%; word-break: break-word;">
+                            {{ strategy }}
+                        </span>
                         {% endfor %}
                         {% else %}
                         <em>No strategies</em>
+                        {% endif %}
+
+                        <p class="mt-3"><strong>Domínios:</strong></p>
+                        {% if session.domains %}
+                        {% for domain in session.domains %}
+                        <span class="badge bg-secondary me-1 text-wrap"
+                            style="max-width: 100%; word-break: break-word;">
+                            {{ domain }}
+                        </span>
+                        {% endfor %}
+                        {% else %}
+                        <em>No domain</em>
                         {% endif %}
 
                         <p class="mt-3"><strong>Teachers:</strong></p>
