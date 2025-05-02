@@ -212,6 +212,7 @@ def get_current_tactic(session_id):
     elapsed_time = (datetime.utcnow() - start_time).total_seconds()
     elapsed_minutes = elapsed_time / 60
 
+
     tactics = []
     for strategy_id in session_json['strategies']:
         strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
@@ -224,6 +225,7 @@ def get_current_tactic(session_id):
         tactics.extend(strategy_tactics)
 
     # return f"{tactics}"
+    
 
     total_elapsed = 0
     for tactic in tactics:
