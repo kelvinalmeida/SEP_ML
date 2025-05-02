@@ -156,8 +156,16 @@
                     document.getElementById("tacticTimer").innerText = `${timeLeft}s restantes`;
 
                     timeLeft--;
+
+
+                    const elementToRemove = document.getElementById('chat');
+                    if (elementToRemove) {
+                        elementToRemove.remove(); // Remove o próprio elemento
+                    }
+
+
+                    // Verifica se a tática atual é "Debate Sincrono"
                     if (tacticName == "Debate Sincrono") {
-                        let chatElement = document.getElementById("chat");
 
                         // Evitar adicionar o botão várias vezes:
                         if (!document.getElementById("chat")) {
@@ -184,9 +192,75 @@
 
                             chat_here.appendChild(button);
                         }
+                    }
+                    else if (tacticName == "Apresentacao Sincrona") {
+                        if (!document.getElementById("chat")) {
 
+                            let button = document.createElement("button");
+                            button.id = "chat";
+                            button.innerText = "Entrar na Apresentação Síncrona";
+
+                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            link_do_meet = null;
+                            for (let tatic_stra in strategyTactics) {
+                                // console.log(strategyTactics[tatic_stra].name);
+                                if (strategyTactics[tatic_stra].name == "Apresentacao Sincrona") {
+                                    link_do_meet = strategyTactics[tatic_stra].description;
+                                    break;
+                                }
+                            }
+
+                            button.onclick = function () {
+                                window.open(link_do_meet, "_blank");
+                            };
+
+                            let chat_here = document.getElementById("chat_here");
+
+                            chat_here.appendChild(button);
+                        }
+                    }
+                    else if (tacticName == "Reuso") {
+                        if (!document.getElementById("chat")) {
+
+                            let button = document.createElement("button");
+                            button.id = "chat";
+                            button.innerText = "Clique para ver o matérial";
+
+                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+
+                            button.onclick = function () {
+                                let domain_id = '{{session.domains[0].id}}';
+                                console.log(domain_id);
+                                let link = `/domains/${domain_id}`;
+                                window.open(link, "_blank");
+                            };
+
+                            let chat_here = document.getElementById("chat_here");
+
+                            chat_here.appendChild(button);
+                        }
+                    }
+                    else if (tacticName == "Envio de Informacao") {
+                        if (!document.getElementById("chat")) {
+
+                            let button = document.createElement("button");
+                            button.id = "chat";
+                            button.innerText = "Agora será enviado um material para o email cadastrado! Por favor, verifique! clique para ir para o email";
+
+                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+
+                            button.onclick = function () {
+                                let link = `https://mail.google.com/`;
+                                window.open(link, "_blank");
+                            };
+
+                            let chat_here = document.getElementById("chat_here");
+
+                            chat_here.appendChild(button);
+                        }
                     }
                 }
+
             }, 1000);
         }
 

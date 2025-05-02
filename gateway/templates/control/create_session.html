@@ -83,7 +83,36 @@
                                 id="strategy-{{ strategy.id }}">
                             <label for="strategy-{{ strategy.id }}" class="card estrategia h-100">
                                 <div class="card-body text-center">
-                                    <h6 class="card-title mb-0">{{ strategy.name }}</h6>
+                                    <h6 class="card-title mb-3">{{ strategy.name }}</h6>
+                                </div>
+                                <h6 class="card-title mb-0">Taticas</h6>
+                                {% for tatic in strategy.tatics %}
+                                <ul>
+                                    <li>Nome: {{ tatic.name }} tempo: {{ tatic.time }}</li>
+                                </ul>
+                                {% endfor %}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Domínios -->
+                <div class="mb-5">
+                    <div class="section-title">Selecione o(s) Domínio(s)</div>
+                    <div class="row g-3">
+                        {% for domain in domains %}
+                        <div class="col-md-4 selectable-card">
+                            <input type="checkbox" name="domains" value="{{ domain.id }}" id="domain-{{ domain.id }}">
+                            <label for="domain-{{ domain.id }}" class="card domain h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title mb-3">{{ domain.name }}</h6>
+                                    <h6 class="card-title mb-0">pdfs</h6>
+                                    {% for pdf in domain.pdfs %}
+                                    <ul>
+                                        <li>{{ pdf.filename }}</li>
+                                    </ul>
+                                    {% endfor %}
                                 </div>
                             </label>
                         </div>

@@ -16,12 +16,15 @@ def create_strategy():
         tatics = request.form.getlist("tatics")
         times = request.form.getlist("times")
         description = request.form.getlist("description")
+        # return jsonify(name, tatics, times, description)
 
         # Junta tática + tempo
         tatics_with_times = [
-            {"name": tatics[i], "time": int(times[i]), "description": description[i]}
+            {"name": tatics[i], "time": float(times[i]), "description": description[i]}
             for i in range(len(tatics))
         ]
+
+        # return f"{tatics_with_times}"
 
         # adicionando o chat_id para cada tática
         for tatics_with_time in tatics_with_times:

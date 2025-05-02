@@ -3,7 +3,7 @@ from requests.exceptions import RequestException
 import requests
 from .auth import token_required
 from datetime import datetime
-from .services_routs import CONTROL_URL, STRATEGIES_URL, USER_URL
+from .services_routs import CONTROL_URL, STRATEGIES_URL, USER_URL, DOMAIN_URL
 
 session_bp = Blueprint("session", __name__)
 
@@ -16,11 +16,13 @@ def create_session(current_user=None):
             strategy_ids = request.form.getlist('strategies')  # agora é uma lista
             teacher_ids = request.form.getlist('teachers')
             student_ids = request.form.getlist('students')
+            domains_ids = request.form.getlist('domains')
 
             data = {
                 "strategies": strategy_ids,
                 "teachers": teacher_ids,
-                "students": student_ids
+                "students": student_ids,
+                "domains": domains_ids,
             }
 
             response = requests.post(f"{CONTROL_URL}/sessions/create", json=data)
@@ -35,8 +37,10 @@ def create_session(current_user=None):
         strategies = requests.get(f"{STRATEGIES_URL}/strategies").json()
         teachers = requests.get(f"{USER_URL}/teachers").json()
         students = requests.get(f"{USER_URL}/students").json()
+        domains = requests.get(f"{DOMAIN_URL}/domains").json()
+        # return f"{domains}"
 
-        return render_template("control/create_session.html", strategies=strategies, teachers=teachers, students=students)
+        return render_template("control/create_session.html", strategies=strategies, teachers=teachers, students=students, domains=domains)
 
 
 @session_bp.route('/sessions', methods=['GET'])
@@ -50,16 +54,22 @@ def list_sessions(current_user=None):
             return f"Erro ao buscar sessões: {response.status_code}", response.status_code
 
         sessions = response.json()
+        # return f"{sessions}"
 
         # Buscar apenas os nomes das estratégias, professores e alunos
         strategy_data = requests.get(f"{STRATEGIES_URL}/strategies").json()
         teacher_data = requests.get(f"{USER_URL}/teachers").json()
         student_data = requests.get(f"{USER_URL}/students").json()
+        domains_data = requests.get(f"{DOMAIN_URL}/domains").json()
 
         # Mapear apenas os nomes por ID
         strategy_map = {str(item["id"]): item["name"] for item in strategy_data}
         teacher_map = {str(item["id"]): item["name"] for item in teacher_data}
         student_map = {str(item["id"]): item["name"] for item in student_data}
+        domains_map = {str(item["id"]): item["name"] for item in domains_data}
+        
+        # return f"{domains_map}"
+        # return f"{domains_map.get(sessions[0].get('domains', [])[0])}"
 
         for session in sessions:
             session["strategies"] = [
@@ -74,8 +84,10 @@ def list_sessions(current_user=None):
                 student_map.get(str(sid), f"ID {sid}")
                 for sid in session.get("students", [])
             ]
-
-        
+            session["domains"] = [
+                domains_map.get(str(sid), f"ID {sid}")
+                for sid in session.get("domains", [])
+            ]
         
         return render_template("control/list_all_sessions.html", sessions=sessions, current_user=current_user)
 
@@ -100,6 +112,8 @@ def get_session_by_id(session_id, current_user=None):
             return f"Erro ao buscar sessão: {response.status_code}", response.status_code
 
         session = response.json()
+
+        # return f"{session}"
 
         # Busca estratégias com táticas
         strategies_data = requests.get(f"{STRATEGIES_URL}/strategies").json()
@@ -130,16 +144,21 @@ def get_session_by_id(session_id, current_user=None):
 
         session["full_tatics_time"] = full_tactics_time # Adiciona o tempo total de táticas à sessão
 
-        # Busca nomes de professores e estudantes
+        # Busca nomes de professores e estudantes e domains
         teachers_data = requests.get(f"{USER_URL}/teachers").json()
         students_data = requests.get(f"{USER_URL}/students").json()
-
+        domains_data = requests.get(f"{DOMAIN_URL}/domains").json()
+        # return f"{domains_data}"
+    
         teacher_map = {str(item["id"]): item["name"] for item in teachers_data}
         student_map = {str(item["id"]): item["name"] for item in students_data}
+        domains_map = {str(item["id"]): item["name"] for item in domains_data}
 
         session["teachers"] = [teacher_map.get(str(tid), f"ID {tid}") for tid in session.get("teachers", [])]
         session["students"] = [student_map.get(str(sid), f"ID {sid}") for sid in session.get("students", [])]
+        session["domains"] = [{"name": domains_map.get(str(sid), f"ID {sid}"), "id": sid} for sid in session.get("domains", [])]
 
+        # return f"{session}"
         return render_template("control/show_session.html", session=session, current_user=current_user)
 
     except RequestException as e:
@@ -212,6 +231,7 @@ def get_current_tactic(session_id):
     elapsed_time = (datetime.utcnow() - start_time).total_seconds()
     elapsed_minutes = elapsed_time / 60
 
+
     tactics = []
     for strategy_id in session_json['strategies']:
         strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
@@ -224,6 +244,7 @@ def get_current_tactic(session_id):
         tactics.extend(strategy_tactics)
 
     # return f"{tactics}"
+    
 
     total_elapsed = 0
     for tactic in tactics:
