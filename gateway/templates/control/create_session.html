@@ -35,6 +35,11 @@
             /* verde claro */
         }
 
+        .domain {
+            background-color: #f3f5d5;
+            /* exemplo: verde-amarelado claro */
+        }
+
         .professor {
             background-color: #e3f2fd;
             /* azul claro */
@@ -82,17 +87,29 @@
                             <input type="checkbox" name="strategies" value="{{ strategy.id }}"
                                 id="strategy-{{ strategy.id }}">
                             <label for="strategy-{{ strategy.id }}" class="card estrategia h-100">
-                                <div class="card-body text-center">
-                                    <h6 class="card-title mb-3">{{ strategy.name }}</h6>
+                                <div class="card-body">
+                                    <!-- Nome da Estratégia -->
+                                    <div class="text-center mb-3">
+                                        <h5 class="card-title text-primary">{{ strategy.name }}</h5>
+                                    </div>
+
+                                    <!-- Seção de Táticas -->
+                                    <div>
+                                        <h6 class="text-muted mb-2">Táticas:</h6>
+                                        <ul class="list-group list-group-flush">
+                                            {% for tatic in strategy.tatics %}
+                                            <li
+                                                class="list-group-item d-flex justify-content-between align-items-center">
+                                                {{ tatic.name }}
+                                                <span class="badge bg-primary rounded-pill">{{ tatic.time }} min</span>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
                                 </div>
-                                <h6 class="card-title mb-0">Taticas</h6>
-                                {% for tatic in strategy.tatics %}
-                                <ul>
-                                    <li>Nome: {{ tatic.name }} tempo: {{ tatic.time }}</li>
-                                </ul>
-                                {% endfor %}
                             </label>
                         </div>
+
                         {% endfor %}
                     </div>
                 </div>
@@ -102,20 +119,35 @@
                     <div class="section-title">Selecione o(s) Domínio(s)</div>
                     <div class="row g-3">
                         {% for domain in domains %}
-                        <div class="col-md-4 selectable-card">
+                        <div class="col-md-4 selectable-card ">
                             <input type="checkbox" name="domains" value="{{ domain.id }}" id="domain-{{ domain.id }}">
                             <label for="domain-{{ domain.id }}" class="card domain h-100">
-                                <div class="card-body text-center">
-                                    <h6 class="card-title mb-3">{{ domain.name }}</h6>
-                                    <h6 class="card-title mb-0">pdfs</h6>
-                                    {% for pdf in domain.pdfs %}
-                                    <ul>
-                                        <li>{{ pdf.filename }}</li>
-                                    </ul>
-                                    {% endfor %}
+                                <div class="card-body ">
+                                    <!-- Nome do Domínio -->
+                                    <div class="text-center mb-3">
+                                        <h5 class="card-title text-success">{{ domain.name }}</h5>
+                                    </div>
+
+                                    <!-- Lista de PDFs -->
+                                    <div>
+                                        <h6 class="text-muted mb-2">PDFs:</h6>
+                                        <ul class="list-group list-group-flush">
+                                            {% for pdf in domain.pdfs %}
+                                            <li class="list-group-item">
+                                                <i class="bi bi-file-earmark-text me-2"></i>{{ pdf.filename }}
+                                            </li>
+                                            {% endfor %}
+                                            {% if not domain.pdfs %}
+                                            <li class="list-group-item">
+                                                <i class="bi bi-file-earmark-text me-2"></i>Nenhum PDF disponível
+                                            </li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
                                 </div>
                             </label>
                         </div>
+
                         {% endfor %}
                     </div>
                 </div>

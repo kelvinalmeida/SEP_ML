@@ -53,11 +53,7 @@ def chat():
     return render_template('chat.html')
 
 @strategies_bp.route('/chat/create', methods=['POST'])
-def create_chat():
-    # Assuming you have a model named Message with the following fields:
-    # id = db.Column(db.Integer, primary_key=True)
-    # messages = db.Column(PickleType, nullable=False, default=[])
-    
+def create_chat():    
     new_chat = Message()
     db.session.add(new_chat)
     db.session.commit()
@@ -85,23 +81,3 @@ def add_message(chat_id):
         db.session.commit()
         return jsonify(chat.as_dict()), 200
     return jsonify({"error": "Chat not found"}), 404
-
-# @socketio.on('message')
-# def handle_message(data):
-#     id = data.get('id')
-#     username = data.get('username')
-#     content = data.get('content')
-
-#     chat = Message.query.filter_by(id=id).first()
-
-#     # print(f'>>>>>>>>>>>>>> {chat.messages}')
-#     chat.messages.append({"username": username, "content": content})
-#     db.session.commit()
-
-#     # enviar para todos os clientes
-#     send(chat.as_dict(), broadcast=True)
-
-# @socketio.on('load_messages')
-# def handle_load_messages():
-#     chat = Message.query.filter_by(id=1).first()
-#     send(chat.as_dict(), broadcast=True)

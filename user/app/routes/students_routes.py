@@ -4,10 +4,6 @@ from .. import db
 
 student_bp = Blueprint("student_bp", __name__)
 
-@student_bp.route("/")
-def index():
-    return render_template("index.html")
-
 @student_bp.route("/students/create", methods=["GET", "POST"])
 def create_student():
     if request.method == "POST":
