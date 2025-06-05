@@ -47,6 +47,33 @@ def get_strategy_by_id(strategy_id):
     return jsonify({"error": "Strategy not found"}), 404
 
 
+@strategies_bp.route('/strategies/full_tatics_time', methods=['GET'])
+def get_full_tatics_time():
+    ids = request.args.getlist('ids')
+    
+    if not ids:
+        return jsonify({"error": "No IDs provided"}), 400
+
+    try:
+        # converte todos os ids para inteiros
+        ids = list(map(int, ids))
+    except ValueError:
+        return jsonify({"error": "IDs must be integers"}), 400
+
+    strategies = Strategies.query.filter(Strategies.id.in_(ids)).all()
+
+    if not strategies:
+        return jsonify({"error": "No strategies found"}), 404
+
+    full_tactics_time = 0
+
+    for strategy in strategies:
+        for tactic in strategy.tatics:  # Acesso via atributo, não via dicionário
+            full_tactics_time += getattr(tactic, "time", 0)  # ou tactic.time se tiver certeza que tem esse atributo
+
+    return jsonify({"full_tactics_time": full_tactics_time}), 200
+    
+
 @strategies_bp.route('/chat')
 def chat():
     # return 'oi'
@@ -81,3 +108,29 @@ def add_message(chat_id):
         db.session.commit()
         return jsonify(chat.as_dict()), 200
     return jsonify({"error": "Chat not found"}), 404
+
+
+@strategies_bp.route('/strategies/ids_to_names', methods=['GET'])
+def ids_to_names():
+    ids = request.args.getlist('ids')
+    
+    if not ids:
+        return jsonify({"error": "No IDs provided"}), 400
+
+    try:
+        # converte todos os ids para inteiros
+        ids = list(map(int, ids))
+    except ValueError:
+        return jsonify({"error": "IDs must be integers"}), 400
+
+    strategies = Strategies.query.filter(Strategies.id.in_(ids)).all()
+
+    if not strategies:
+        return jsonify({"error": "No strategies found"}), 404
+
+    result = [ {
+        "name": strategy.name, 
+        "tatics": [tatic.as_dict() for tatic in strategy.tatics] } 
+        for strategy in strategies ]
+
+    return jsonify(result), 200

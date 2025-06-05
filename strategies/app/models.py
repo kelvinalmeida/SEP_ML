@@ -1,7 +1,6 @@
 from . import db 
 from sqlalchemy.types import PickleType
 from sqlalchemy.ext.mutable import MutableList
-from datetime import datetime
 
 class Strategies(db.Model):
     id = db.Column(db.Integer, primary_key=True)

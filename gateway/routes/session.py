@@ -113,50 +113,25 @@ def get_session_by_id(session_id, current_user=None):
 
         session = response.json()
 
-        # return f"{session}"
+        params = { 'ids': session.get("strategies", []) }
+        strategies = requests.get(f"{STRATEGIES_URL}/strategies/ids_to_names", params=params).json()
+        session["strategies"] = strategies
 
-        # Busca estratégias com táticas
-        strategies_data = requests.get(f"{STRATEGIES_URL}/strategies").json()
 
-        # Cria dicionário de estratégias por ID (incluindo táticas)
-        strategy_map = {
-            str(item["id"]): {
-                "name": item["name"],
-                "tatics": item.get("tatics", [])  # Inclui lista de táticas com name, time e description
-            }
-            for item in strategies_data
-        }
+        all_tatics_time = requests.get(f"{STRATEGIES_URL}/strategies/full_tatics_time", params=params).json()
+        session["full_tatics_time"] = all_tatics_time.get("full_tactics_time") # Adiciona o tempo total de táticas à sessão
 
-        # Substitui os IDs de estratégias por objetos completos
-        session["strategies"] = [
-            strategy_map.get(str(sid), {
-                "name": f"ID {sid}",
-                "tatics": []
-            })
-            for sid in session.get("strategies", [])
-        ]
+        teachers_params = { 'ids': session.get("teachers", [])}
+        teachers = requests.get(f"{USER_URL}/teachers/ids_to_names", params=teachers_params).json()
+        session["teachers"] = teachers
 
-        full_tactics_time = 0
-        for strategy in session["strategies"]:
-            for tactic in strategy["tatics"]:
-                # Adiciona o tempo de cada tática ao tempo total
-                full_tactics_time += tactic.get("time", 0)
+        students_params = { 'ids': session.get("students", [])}
+        students = requests.get(f"{USER_URL}/students/ids_to_names", params=students_params).json()
+        session["students"] = students
 
-        session["full_tatics_time"] = full_tactics_time # Adiciona o tempo total de táticas à sessão
-
-        # Busca nomes de professores e estudantes e domains
-        teachers_data = requests.get(f"{USER_URL}/teachers").json()
-        students_data = requests.get(f"{USER_URL}/students").json()
-        domains_data = requests.get(f"{DOMAIN_URL}/domains").json()
-        # return f"{domains_data}"
-    
-        teacher_map = {str(item["id"]): item["name"] for item in teachers_data}
-        student_map = {str(item["id"]): item["name"] for item in students_data}
-        domains_map = {str(item["id"]): item["name"] for item in domains_data}
-
-        session["teachers"] = [teacher_map.get(str(tid), f"ID {tid}") for tid in session.get("teachers", [])]
-        session["students"] = [student_map.get(str(sid), f"ID {sid}") for sid in session.get("students", [])]
-        session["domains"] = [{"name": domains_map.get(str(sid), f"ID {sid}"), "id": sid} for sid in session.get("domains", [])]
+        domains_params = { 'ids': session.get("domains", [])}
+        domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()
+        session["domains"] = domains
 
         # return f"{session}"
         return render_template("control/show_session.html", session=session, current_user=current_user)
