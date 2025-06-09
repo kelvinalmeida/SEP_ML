@@ -32,7 +32,7 @@ class Message(db.Model):
     def as_dict(self):
         return {
             "id": self.id,
-            "messages": self.messages
+            "messages": self.messages,
+            "messages_privates": self.messages_privates
         }
-
 

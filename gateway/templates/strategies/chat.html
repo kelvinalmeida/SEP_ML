@@ -94,11 +94,11 @@
     <script>
         var socket = io();
         var myUsername = '';
-        const strategyId = "{{ strategy_id }}";
+        const chat_id = "{{ chat_id }}";
 
         socket.on('connect', function () {
             console.log('Connected to server');
-            socket.emit('load_messages', { id: strategyId });
+            socket.emit('load_messages', { id: chat_id });
         });
 
         socket.on('message', function (msg) {
@@ -148,7 +148,7 @@
 
             if (username !== "" && message !== "") {
                 myUsername = username; // Guardar o meu username para comparação
-                socket.emit('message', { id: strategyId, username: username, content: message });
+                socket.emit('message', { id: chat_id, username: username, content: message });
                 messageInput.value = "";
             }
         });
