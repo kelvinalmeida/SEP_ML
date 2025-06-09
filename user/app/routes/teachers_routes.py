@@ -55,3 +55,28 @@ def delete_teacher(teacher_id):
         db.session.commit()
         return jsonify({"message": "Professor deletado!"})
     return jsonify({"error": "Professor não encontrado"}), 404
+
+
+@teachers_bp.route('/teachers/ids_to_names', methods=['GET'])
+def ids_to_names():
+    ids = request.args.getlist('ids')
+    
+    if not ids:
+        return jsonify({"error": "No IDs provided"}), 400
+
+    try:
+        # converte todos os ids para inteiros
+        ids = list(map(int, ids))
+    except ValueError:
+        return jsonify({"error": "IDs must be integers"}), 400
+
+    teachers = Teacher.query.filter(Teacher.id.in_(ids)).all()
+
+    if not teachers:
+        return jsonify({"error": "No teachers found"}), 404
+
+    result = [ 
+        strategy.name
+        for strategy in teachers ]
+
+    return jsonify(result), 200

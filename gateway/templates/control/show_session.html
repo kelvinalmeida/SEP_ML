@@ -69,6 +69,7 @@
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
                         <div id="tacticTimer" class="badge bg-dark">--</div>
                         <div id="chat_here"></div>
+                        <div id="pdf_data" data-pdfs='{{ session.domains[0].pdfs | tojson | safe }}'></div>
                     </div>
                 </div>
 
@@ -163,12 +164,13 @@
                         elementToRemove.remove(); // Remove o próprio elemento
                     }
 
-
                     // Verifica se a tática atual é "Debate Sincrono"
                     if (tacticName == "Debate Sincrono") {
 
                         // Evitar adicionar o botão várias vezes:
                         if (!document.getElementById("chat")) {
+
+                            removerPDFdaTela();
 
                             let button = document.createElement("button");
                             button.id = "chat";
@@ -196,6 +198,8 @@
                     else if (tacticName == "Apresentacao Sincrona") {
                         if (!document.getElementById("chat")) {
 
+                            removerPDFdaTela();
+
                             let button = document.createElement("button");
                             button.id = "chat";
                             button.innerText = "Entrar na Apresentação Síncrona";
@@ -220,28 +224,52 @@
                         }
                     }
                     else if (tacticName == "Reuso") {
-                        if (!document.getElementById("chat")) {
 
-                            let button = document.createElement("button");
-                            button.id = "chat";
-                            button.innerText = "Clique para ver o matérial";
+                        if (!document.getElementById("pdf_container")) {
 
-                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            let pdfContainer = document.createElement("div");
+                            pdfContainer.id = "pdf_container";
 
-                            button.onclick = function () {
-                                let domain_id = '{{session.domains[0].id}}';
-                                console.log(domain_id);
-                                let link = `/domains/${domain_id}`;
-                                window.open(link, "_blank");
-                            };
+                            let pdfData = document.getElementById("pdf_data").getAttribute("data-pdfs");
+                            let pdfs = JSON.parse(pdfData);
+
+                            pdfs.forEach(pdf => {
+                                fetch(`/pdfs/${pdf.id}`, {
+                                    headers: {
+                                        "Authorization": "Bearer {{ token }}"
+                                    }
+                                })
+                                    .then(response => {
+                                        if (!response.ok) {
+                                            throw new Error("Erro ao baixar PDF");
+                                        }
+                                        return response.blob();
+                                    })
+                                    .then(blob => {
+                                        let url = URL.createObjectURL(blob);
+                                        let embed = document.createElement("embed");
+                                        embed.src = url;
+                                        embed.type = "application/pdf";
+                                        embed.width = "100%";
+                                        embed.height = "600px";
+                                        embed.className = "mb-3";
+
+                                        pdfContainer.appendChild(embed);
+                                    })
+                                    .catch(error => {
+                                        console.error("Erro ao carregar PDF: ", error);
+                                    });
+                            });
 
                             let chat_here = document.getElementById("chat_here");
-
-                            chat_here.appendChild(button);
+                            chat_here.appendChild(pdfContainer);
                         }
                     }
+
                     else if (tacticName == "Envio de Informacao") {
                         if (!document.getElementById("chat")) {
+
+                            removerPDFdaTela();
 
                             let button = document.createElement("button");
                             button.id = "chat";
@@ -262,6 +290,13 @@
                 }
 
             }, 1000);
+        }
+
+        function removerPDFdaTela() {
+            let existingPdfContainer = document.getElementById("pdf_container");
+            if (existingPdfContainer) {
+                existingPdfContainer.remove();
+            }
         }
 
         function fetchCurrentTactic(sessionId) {

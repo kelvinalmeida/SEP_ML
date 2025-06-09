@@ -76,16 +76,15 @@ def get_strategy_time(strategy_id):
     except RequestException as e:
         return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503
     
-@strategy_bp.route('/chat/<int:strategy_id>', methods=['GET'])
-def chat(strategy_id):
-    # return 'oi'
-    return render_template('/strategies/chat.html', strategy_id=strategy_id)
+@strategy_bp.route('/chat/<int:chat_id>', methods=['GET'])
+def chat(chat_id):
+    return render_template('/strategies/chat.html', chat_id=chat_id)
 
 
-@strategy_bp.route('/chat/show', methods=['GET'])
-def show_chats():
-    mensagem_as_dic = requests.get(f"{STRATEGIES_URL}/chat/{id}").json()
-    return jsonify(mensagem_as_dic), 200
+# @strategy_bp.route('/chat/show', methods=['GET'])
+# def show_chats():
+#     mensagem_as_dic = requests.get(f"{STRATEGIES_URL}/chat/{id}").json()
+#     return jsonify(mensagem_as_dic), 200
 
 @socketio.on('message')
 def handle_message(data):
@@ -99,13 +98,13 @@ def handle_message(data):
     }
 
     mensagem_as_dic = requests.post(f"{STRATEGIES_URL}/chat/{id}/add_message", json=mensagem).json()
-
+ 
     
     # enviar para todos os clientes
     send(mensagem_as_dic, broadcast=True)
 
 @socketio.on('load_messages')
 def handle_load_messages(data):
-    id = data.get('id')
+    id = data.get('id') 
     mensagem_as_dic = requests.get(f"{STRATEGIES_URL}/chat/{id}").json()
     send(mensagem_as_dic, broadcast=True)

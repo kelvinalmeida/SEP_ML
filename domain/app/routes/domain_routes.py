@@ -19,29 +19,29 @@ def create_tables():
 def create_domain():
     UPLOAD_FOLDER = os.path.join(current_app.root_path, 'uploads')
 
-    # return f"{UPLOAD_FOLDER}", 200
-    if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
-        files = request.files.getlist('pdfs')
+    name = request.form.get('name')
+    description = request.form.get('description')
+    files = request.files.getlist('pdfs')
 
-        new_domain = Domain(name=name, description=description)
-        db.session.add(new_domain)
-        db.session.commit()
+    new_domain = Domain(name=name, description=description)
+    db.session.add(new_domain)
+    db.session.commit()
 
-        for file in files:
-            if file and file.filename.endswith('.pdf'):
-                filename = secure_filename(file.filename)
-                path = os.path.join(UPLOAD_FOLDER, filename)
-                file.save(path)
+    for file in files:
+        if file and file.filename.endswith('.pdf'):
+            filename = secure_filename(file.filename)
+            path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(path)
 
-                pdf = PDF(filename=filename, path=path, domain_id=new_domain.id)
-                db.session.add(pdf)
+            pdf = PDF(filename=filename, path=path, domain_id=new_domain.id)
+            db.session.add(pdf)
+        else:
+            return jsonify({"message": "Domain not created."}), 400
 
-        db.session.commit()
-        return jsonify({"message": "Domain created successfully!"}), 200
+    db.session.commit()
+    return jsonify({"message": "Domain created successfully!"}), 200
 
-    return jsonify({"message": "Domain not created"}), 400
+
 
 
 @domain_bp.route('/domains', methods=['GET'])
@@ -67,3 +67,28 @@ def download_pdf(pdf_id):
         return jsonify({'error': 'File not found'}), 404
 
     return send_file(file_path, as_attachment=True)
+
+
+@domain_bp.route('/domains/ids_to_names', methods=['GET'])
+def ids_to_names():
+    ids = request.args.getlist('ids')
+    
+    if not ids:
+        return jsonify({"error": "No IDs provided"}), 400
+
+    try:
+        # converte todos os ids para inteiros
+        ids = list(map(int, ids))
+    except ValueError:
+        return jsonify({"error": "IDs must be integers"}), 400
+
+    domains = Domain.query.filter(Domain.id.in_(ids)).all()
+
+    if not domains:
+        return jsonify({"error": "No domains found"}), 404
+
+    result = [ 
+        domain.to_dict()
+        for domain in domains ]
+
+    return jsonify(result), 200

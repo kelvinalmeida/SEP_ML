@@ -1,7 +1,6 @@
 from . import db 
 from sqlalchemy.types import PickleType
 from sqlalchemy.ext.mutable import MutableList
-from datetime import datetime
 
 class Strategies(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -33,7 +32,7 @@ class Message(db.Model):
     def as_dict(self):
         return {
             "id": self.id,
-            "messages": self.messages
+            "messages": self.messages,
+            "messages_privates": self.messages_privates
         }
-
 

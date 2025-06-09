@@ -23,7 +23,6 @@ def create_domain(current_user=None):
             'description': description
         }
 
-
         # Monta os arquivos
         files_payload = [
             ('pdfs', (file.filename, file.stream, file.content_type))
@@ -70,6 +69,9 @@ def get_domain(current_user=None, domain_id=None):
     except RequestException as e:
         flash("Failed to fetch domain.")
         domain = None
+
+    
+    return f"{domain}"
 
     return render_template("/domain/domain_detail.html", domain=domain)
     # return jsonify(domain), 200  # Retorna os detalhes do domínio em formato JSON
