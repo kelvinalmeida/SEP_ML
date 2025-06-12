@@ -1,6 +1,9 @@
 from . import db 
 from sqlalchemy.types import PickleType
 from sqlalchemy.ext.mutable import MutableList
+from datetime import datetime
+from sqlalchemy.orm import relationship
+
 
 class Strategies(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -25,14 +28,50 @@ class Tatics:
             "chat_id": self.chat_id if self.chat_id else None 
         }
 
+
 class Message(db.Model):
+    __tablename__ = 'message' # Nome da tabela explícito é uma boa prática
     id = db.Column(db.Integer, primary_key=True)
+    
+    # 1. Campo para mensagens gerais, mantido como você pediu.
     messages = db.Column(MutableList.as_mutable(PickleType), nullable=False, default=list)
+    
+    # 2. Relação com PrivateMessage. Substitui o antigo campo 'menssages_privates'.
+    #    Agora, isso vai conter uma lista de objetos PrivateMessage.
+    messages_privates = relationship("PrivateMessage", back_populates="message_parent", cascade="all, delete-orphan")
 
     def as_dict(self):
         return {
             "id": self.id,
             "messages": self.messages,
-            "messages_privates": self.messages_privates
+            # Mapeia cada objeto PrivateMessage para o seu formato de dicionário
+            "messages_privates": [pm.as_dict() for pm in self.messages_privates]
         }
 
+
+class PrivateMessage(db.Model):
+    __tablename__ = 'private_message' # Nome da tabela explícito
+    
+    # 3. Chave primária é essencial para qualquer tabela em uma relação.
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # 4. Corrigido os nomes dos campos para sender (remetente) e receiver (destinatário).
+    sender_id = db.Column(db.Integer, nullable=False)
+    receiver_id = db.Column(db.Integer, nullable=False)
+    content = db.Column(db.Text, nullable=False) # db.Text é mais apropriado para conteúdo de mensagem
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # 5. Chave estrangeira que liga esta mensagem privada a uma "conversa" principal.
+    message_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=False)
+    
+    # 6. Relacionamento de volta para a classe Message.
+    message_parent = relationship("Message", back_populates="messages_privates")
+
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "sender_id": self.sender_id,
+            "receiver_id": self.receiver_id,
+            "content": self.content,
+            "timestamp": self.timestamp.isoformat()
+        }

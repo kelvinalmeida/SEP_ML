@@ -78,6 +78,7 @@ def get_strategy_time(strategy_id):
     
 @strategy_bp.route('/chat/<int:chat_id>', methods=['GET'])
 def chat(chat_id):
+    # return f'${chat_id}'
     return render_template('/strategies/chat.html', chat_id=chat_id)
 
 
@@ -98,7 +99,6 @@ def handle_message(data):
     }
 
     mensagem_as_dic = requests.post(f"{STRATEGIES_URL}/chat/{id}/add_message", json=mensagem).json()
- 
     
     # enviar para todos os clientes
     send(mensagem_as_dic, broadcast=True)

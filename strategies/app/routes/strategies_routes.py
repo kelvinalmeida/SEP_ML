@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from app.models import Strategies, Tatics, Message
+from app.models import Strategies, Tatics, Message, PrivateMessage
 from app import db  # importar o socketio criado no __init__.py
 
 
@@ -79,35 +79,63 @@ def chat():
     # return 'oi'
     return render_template('chat.html')
 
-@strategies_bp.route('/chat/create', methods=['POST'])
-def create_chat():    
-    new_chat = Message()
-    db.session.add(new_chat)
-    db.session.commit()
-    return jsonify({"success": "Chat created!", "id": new_chat.id}), 200
+# @strategies_bp.route('/chat/create', methods=['POST'])
+# def create_chat():    
+#     new_chat = Message()
+#     db.session.add(new_chat)
+#     db.session.commit()
+#     return jsonify({"success": "Chat created!", "id": new_chat.id}), 200
 
 @strategies_bp.route('/chat/show', methods=['GET'])
 def show_chats():
     all_chats = Message.query.all()
     return jsonify([{"id": c.id, "messages": c.messages} for c in all_chats]), 200
 
-@strategies_bp.route('/chat/<int:chat_id>', methods=['GET'])
-def get_chat(chat_id):
-    chat = Message.query.get(chat_id)
-    if chat:
-        return jsonify(chat.as_dict()), 200
-    return jsonify({"error": "Chat not found"}), 404
+# @strategies_bp.route('/chat/<int:chat_id>', methods=['GET'])
+# def get_chat(chat_id):
+#     chat = Message.query.get(chat_id)
+#     if chat:
+#         return jsonify(chat.as_dict()), 200
+#     return jsonify({"error": "Chat not found"}), 404
 
-@strategies_bp.route('/chat/<int:chat_id>/add_message', methods=['POST'])
-def add_message(chat_id):
-    chat = Message.query.get(chat_id)
-    if chat:
-        username = request.json.get('username')
-        content = request.json.get('content')
-        chat.messages.append({"username": username, "content": content})
-        db.session.commit()
-        return jsonify(chat.as_dict()), 200
-    return jsonify({"error": "Chat not found"}), 404
+# @strategies_bp.route('/chat/<int:chat_id>/add_message', methods=['POST'])
+# def add_message(chat_id):
+#     chat = Message.query.get(chat_id)
+#     if chat:
+#         username = request.json.get('username')
+#         content = request.json.get('content')
+#         chat.messages.append({"username": username, "content": content})
+#         db.session.commit()
+#         return jsonify(chat.as_dict()), 200
+#     return jsonify({"error": "Chat not found"}), 404
+
+
+# Criar uma nova mensagem privada
+@strategies_bp.route('/private_chat/send', methods=['POST'])
+def send_private_message():
+    data = request.json
+    msg = PrivateMessage(
+        sender_id=data['sender_id'],
+        receiver_id=data['receiver_id'],
+        content=data['content']
+    )
+    db.session.add(msg)
+    db.session.commit()
+    return jsonify(msg.as_dict()), 201
+
+# Obter histórico entre dois usuários
+@strategies_bp.route('/private_chat/history', methods=['GET'])
+def get_private_messages():
+    sender_id = request.args.get('sender_id', type=int)
+    receiver_id = request.args.get('receiver_id', type=int)
+    
+    messages = PrivateMessage.query.filter(
+        ((PrivateMessage.sender_id == sender_id) & (PrivateMessage.receiver_id == receiver_id)) |
+        ((PrivateMessage.sender_id == receiver_id) & (PrivateMessage.receiver_id == sender_id))
+    ).order_by(PrivateMessage.timestamp).all()
+    
+    return jsonify([m.as_dict() for m in messages]), 200
+
 
 
 @strategies_bp.route('/strategies/ids_to_names', methods=['GET'])
@@ -134,3 +162,47 @@ def ids_to_names():
         for strategy in strategies ]
 
     return jsonify(result), 200
+
+
+@strategies_bp.route('/chat/<int:strategy_id>', methods=['GET'])
+def get_strategy_chat(strategy_id):
+    chat = Message.query.get(strategy_id)
+    if chat:
+        return jsonify(chat.as_dict()), 200
+    return jsonify({"error": "Chat not found"}), 404
+
+
+@strategies_bp.route('/chat/create', methods=['POST'])
+def create_chat():    
+    new_chat = Message()
+    db.session.add(new_chat)
+    db.session.commit()
+    return jsonify({"success": "Chat created!", "id": new_chat.id}), 200
+
+
+@strategies_bp.route('/chat/<int:chat_id>/add_message', methods=['POST'])
+def add_message(chat_id):
+    chat = Message.query.get(chat_id)
+    if chat:
+        username = request.json.get('username')
+        content = request.json.get('content')
+        chat.messages.append({"username": username, "content": content})
+        db.session.commit()
+        return jsonify(chat.as_dict()), 200
+    return jsonify({"error": "Chat not found"}), 404
+
+
+@strategies_bp.route('/chat/<int:chat_id>/add_priv_message', methods=['POST'])
+def add_priv_message(chat_id):
+    chat = Message.query.get(chat_id)
+
+    sender_id = request.json.get('sender_id')
+    receiver_id = request.json.get('receiver_id')
+    content = request.json.get('content')
+    msg = PrivateMessage(sender_id=sender_id, receiver_id=receiver_id, content=content)
+
+    chat.messages_privates.append(msg)
+    db.session.add(msg)
+    db.session.commit()
+
+    return jsonify(chat.as_dict()), 200
