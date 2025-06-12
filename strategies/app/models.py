@@ -33,6 +33,5 @@ class Message(db.Model):
         return {
             "id": self.id,
             "messages": self.messages,
-            "messages_privates": self.messages_privates
         }
 
