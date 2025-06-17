@@ -123,18 +123,18 @@ def send_private_message():
     db.session.commit()
     return jsonify(msg.as_dict()), 201
 
-# Obter histórico entre dois usuários
-@strategies_bp.route('/private_chat/history', methods=['GET'])
-def get_private_messages():
-    sender_id = request.args.get('sender_id', type=int)
-    receiver_id = request.args.get('receiver_id', type=int)
+# # Obter histórico entre dois usuários
+# @strategies_bp.route('/private_chat/history', methods=['GET'])
+# def get_private_messages():
+#     sender_id = request.args.get('sender_id', type=int)
+#     receiver_id = request.args.get('receiver_id', type=int)
     
-    messages = PrivateMessage.query.filter(
-        ((PrivateMessage.sender_id == sender_id) & (PrivateMessage.receiver_id == receiver_id)) |
-        ((PrivateMessage.sender_id == receiver_id) & (PrivateMessage.receiver_id == sender_id))
-    ).order_by(PrivateMessage.timestamp).all()
+#     messages = PrivateMessage.query.filter(
+#         ((PrivateMessage.sender_id == sender_id) & (PrivateMessage.receiver_id == receiver_id)) |
+#         ((PrivateMessage.sender_id == receiver_id) & (PrivateMessage.receiver_id == sender_id))
+#     ).order_by(PrivateMessage.timestamp).all()
     
-    return jsonify([m.as_dict() for m in messages]), 200
+#     return jsonify([m.as_dict() for m in messages]), 200
 
 
 
@@ -180,29 +180,62 @@ def create_chat():
     return jsonify({"success": "Chat created!", "id": new_chat.id}), 200
 
 
-@strategies_bp.route('/chat/<int:chat_id>/add_message', methods=['POST'])
-def add_message(chat_id):
+# --- NOVOS ENDPOINTS ---
+
+@strategies_bp.route('/chat/<int:chat_id>/general_messages', methods=['GET'])
+def get_general_messages(chat_id):
+    """Retorna apenas as mensagens do chat geral."""
     chat = Message.query.get(chat_id)
     if chat:
-        username = request.json.get('username')
-        content = request.json.get('content')
-        chat.messages.append({"username": username, "content": content})
-        db.session.commit()
-        return jsonify(chat.as_dict()), 200
+        return jsonify(chat.as_dict()), 200 
     return jsonify({"error": "Chat not found"}), 404
 
+@strategies_bp.route('/chat/<int:chat_id>/private_messages/<int:user1_id>/<int:user2_id>', methods=['GET'])
+def get_private_messages(chat_id, user1_id, user2_id):
+    """Retorna o histórico de mensagens entre dois usuários específicos."""
+    chat = Message.query.get(chat_id)
+    if not chat:
+        return jsonify({"error": "Chat not found"}), 404
+        
+    messages = PrivateMessage.query.filter(
+        PrivateMessage.message_id == chat_id,
+        or_(
+            (PrivateMessage.sender_id == user1_id) & (PrivateMessage.receiver_id == user2_id),
+            (PrivateMessage.sender_id == user2_id) & (PrivateMessage.receiver_id == user1_id)
+        )
+    ).order_by(PrivateMessage.timestamp.asc()).all()
+    
+    return jsonify([msg.as_dict() for msg in messages]), 200
+
+@strategies_bp.route('/chat/<int:chat_id>/add_message', methods=['POST'])
+def add_message(chat_id):
+    """Adiciona uma mensagem ao chat geral. Retorna apenas a mensagem adicionada."""
+    chat = Message.query.get(chat_id)
+    if not chat:
+        return jsonify({"error": "Chat not found"}), 404
+    
+    data = request.json
+    new_message = {"username": data.get('username'), "content": data.get('content')}
+    chat.messages.append(new_message)
+    db.session.commit()
+    return jsonify(new_message), 201 # 201 Created
 
 @strategies_bp.route('/chat/<int:chat_id>/add_priv_message', methods=['POST'])
 def add_priv_message(chat_id):
+    """Adiciona uma mensagem privada. Retorna a mensagem criada."""
     chat = Message.query.get(chat_id)
+    if not chat:
+        return jsonify({"error": "Chat not found"}), 404
 
-    sender_id = request.json.get('sender_id')
-    receiver_id = request.json.get('receiver_id')
-    content = request.json.get('content')
-    msg = PrivateMessage(sender_id=sender_id, receiver_id=receiver_id, content=content)
-
+    data = request.json
+    msg = PrivateMessage(
+        sender_id=data.get('sender_id'),
+        receiver_id=data.get('receiver_id'),
+        content=data.get('content'),
+        username=data.get('username') # Adicionando username
+    )
     chat.messages_privates.append(msg)
-    db.session.add(msg)
+    # Não precisa de db.session.add(msg) por causa do cascade
     db.session.commit()
-
-    return jsonify(chat.as_dict()), 200
+    
+    return jsonify(msg.as_dict()), 201

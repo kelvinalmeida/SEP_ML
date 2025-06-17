@@ -75,8 +75,11 @@ def ids_to_names():
     if not teachers:
         return jsonify({"error": "No teachers found"}), 404
 
-    result = [ 
-        strategy.name
-        for strategy in teachers ]
+    # result = [ 
+    #     strategy.name
+    #     for strategy in teachers ]
+    
+    result = { "names": [teacher.name for teacher in teachers],
+               "ids_with_names": [{"name": teacher.name, "id": teacher.id} for teacher in teachers] }
 
     return jsonify(result), 200

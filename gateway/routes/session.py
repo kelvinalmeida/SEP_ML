@@ -115,23 +115,23 @@ def get_session_by_id(session_id, current_user=None):
 
         params = { 'ids': session.get("strategies", []) }
         strategies = requests.get(f"{STRATEGIES_URL}/strategies/ids_to_names", params=params).json()
-        session["strategies"] = strategies
-
+        session["strategies"] = strategies  # Adiciona os nomes das estratégias à sessão
+    
 
         all_tatics_time = requests.get(f"{STRATEGIES_URL}/strategies/full_tatics_time", params=params).json()
         session["full_tatics_time"] = all_tatics_time.get("full_tactics_time") # Adiciona o tempo total de táticas à sessão
 
         teachers_params = { 'ids': session.get("teachers", [])}
         teachers = requests.get(f"{USER_URL}/teachers/ids_to_names", params=teachers_params).json()
-        session["teachers"] = teachers
+        session["teachers"] = teachers["names"] 
 
         students_params = { 'ids': session.get("students", [])}
         students = requests.get(f"{USER_URL}/students/ids_to_names", params=students_params).json()
-        session["students"] = students
+        session["students"] = students["names"] 
 
         domains_params = { 'ids': session.get("domains", [])}
         domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()
-        session["domains"] = domains
+        session["domains"] = domains 
 
         # return f"{session}"
         return render_template("control/show_session.html", session=session, current_user=current_user)

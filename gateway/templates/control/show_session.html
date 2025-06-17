@@ -187,7 +187,7 @@
                             }
 
                             button.onclick = function () {
-                                window.location.href = `/chat/${id_chat}`;
+                                window.location.href = `/chat/${id_chat}/{{ session.id }}`;
                             };
 
                             let chat_here = document.getElementById("chat_here");

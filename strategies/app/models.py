@@ -50,21 +50,16 @@ class Message(db.Model):
 
 
 class PrivateMessage(db.Model):
-    __tablename__ = 'private_message' # Nome da tabela explícito
+    __tablename__ = 'private_message'
     
-    # 3. Chave primária é essencial para qualquer tabela em uma relação.
     id = db.Column(db.Integer, primary_key=True)
-    
-    # 4. Corrigido os nomes dos campos para sender (remetente) e receiver (destinatário).
     sender_id = db.Column(db.Integer, nullable=False)
     receiver_id = db.Column(db.Integer, nullable=False)
-    content = db.Column(db.Text, nullable=False) # db.Text é mais apropriado para conteúdo de mensagem
+    username = db.Column(db.String(80), nullable=False) # CAMPO ADICIONADO
+    content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # 5. Chave estrangeira que liga esta mensagem privada a uma "conversa" principal.
     message_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=False)
-    
-    # 6. Relacionamento de volta para a classe Message.
     message_parent = relationship("Message", back_populates="messages_privates")
 
     def as_dict(self):
@@ -72,6 +67,7 @@ class PrivateMessage(db.Model):
             "id": self.id,
             "sender_id": self.sender_id,
             "receiver_id": self.receiver_id,
+            "username": self.username, # CAMPO ADICIONADO
             "content": self.content,
             "timestamp": self.timestamp.isoformat()
         }
