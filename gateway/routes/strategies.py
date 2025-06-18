@@ -121,16 +121,25 @@ def chat(chat_id, session_id, current_user=None):
         students_response.raise_for_status()
         teachers_response = requests.get(f"{USER_URL}/teachers/ids_to_names", params=teachers)
         teachers_response.raise_for_status()
-        # return f"{users_response.json()}"
+    
+        estudante_users = students_response.json()['ids_with_names']
+        professor_users = teachers_response.json()['ids_with_names']
 
-        all_user_names = list(set(students_response.json()['names'] + teachers_response.json()['names']))
+        all_user_names = []
+
+        for estudante in estudante_users:
+            all_user_names.append(estudante)
+
+        for professor in professor_users:
+            all_user_names.append(professor)
+
 
         # Guarda o ID do usuário na sessão do Flask para uso nos sockets
         
         session['user_id'] = current_user['id']
         session['username'] = current_user['name']
 
-        all_users = json.dumps(all_user_names)
+        session['all_users'] = json.dumps(all_user_names)
 
         # return f"{chat_id}, {all_users}"
         
@@ -139,7 +148,7 @@ def chat(chat_id, session_id, current_user=None):
             '/strategies/chat.html', 
             chat_id=chat_id, 
             current_user=current_user, 
-            all_users=all_users # Passa uma lista simples de usuários
+            # all_users=all_users # Passa uma lista simples de usuários
         )
     except RequestException as e:
         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
@@ -159,7 +168,9 @@ def on_join(data):
     
     # Adiciona o cliente à sala do chat
     join_room(chat_id)
-    print(f'Usuário {username} entrou na sala {chat_id}')
+
+    emit('update_user_list', session['all_users'])
+    
     
     
 @socketio.on('disconnect')

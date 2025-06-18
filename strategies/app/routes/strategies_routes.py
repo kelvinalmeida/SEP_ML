@@ -1,3 +1,4 @@
+from operator import or_
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from app.models import Strategies, Tatics, Message, PrivateMessage
 from app import db  # importar o socketio criado no __init__.py

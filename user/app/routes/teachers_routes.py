@@ -80,6 +80,6 @@ def ids_to_names():
     #     for strategy in teachers ]
     
     result = { "names": [teacher.name for teacher in teachers],
-               "ids_with_names": [{"name": teacher.name, "id": teacher.id} for teacher in teachers] }
+               "ids_with_names": [{"name": teacher.name, "id": teacher.id, 'type': 'professor'} for teacher in teachers] }
 
     return jsonify(result), 200

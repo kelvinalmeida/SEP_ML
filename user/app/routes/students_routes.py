@@ -73,6 +73,6 @@ def ids_to_names():
         return jsonify({"error": "No students found"}), 404
 
     result = { "names": [student.name for student in students],
-               "ids_with_names": [{"name": student.name, "id": student.id} for student in students] }
+               "ids_with_names": [{"name": student.name, "id": student.id, 'type': 'estudante'} for student in students] }
 
     return jsonify(result), 200
