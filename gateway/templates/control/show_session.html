@@ -69,6 +69,7 @@
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
                         <div id="tacticTimer" class="badge bg-dark">--</div>
                         <div id="chat_here"></div>
+
                         <div id="pdf_data" data-pdfs='{{ session.domains[0].pdfs | tojson | safe }}'></div>
                     </div>
                 </div>
@@ -140,7 +141,6 @@
         </div>
     </div>
 
-    <!-- Script de controle -->
     <script>
         let countdownInterval = null;
 

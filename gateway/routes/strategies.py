@@ -140,8 +140,6 @@ def chat(chat_id, session_id, current_user=None):
         session['username'] = current_user['name']
 
         session['all_users'] = json.dumps(all_user_names)
-
-        # return f"{chat_id}, {all_users}"
         
         # Passa a lista de usuários e o usuário atual para o template
         return render_template(
@@ -228,6 +226,7 @@ def handle_private_message(data):
     chat_id = data.get('chat_id')
     sender_id = session.get('user_id')
     recipient_id = data.get('recipient_id')
+    recipient_name = data.get('recipient_name')
 
     message_payload = {
         "sender_id": sender_id,
