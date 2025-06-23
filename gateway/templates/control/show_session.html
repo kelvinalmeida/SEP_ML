@@ -143,6 +143,38 @@
 
     <script>
         let countdownInterval = null;
+        let taticaAtiva = false;
+
+
+        function debateSicrono(id_chat) {
+            fetch(`/chat_fragment/${id_chat}/{{ session.id }}`)
+                .then(response => response.text())
+                .then(html => {
+                    const chatHere = document.getElementById("chat_here");
+                    chatHere.innerHTML = html;
+
+                    // Reexecutar scripts
+                    chatHere.querySelectorAll("script").forEach(oldScript => {
+                        const newScript = document.createElement("script");
+
+                        if (oldScript.src) {
+                            newScript.src = oldScript.src;
+                            document.body.appendChild(newScript);
+
+                            // Espera o carregamento e só então executa a função
+                            newScript.onload = () => {
+                                if (typeof initializeChatComponent === "function") {
+                                    initializeChatComponent();
+                                }
+                            };
+                        } else {
+                            newScript.textContent = oldScript.textContent;
+                            document.body.appendChild(newScript);
+                        }
+                    });
+                });
+        }
+
 
         function startCountdown(remainingTime, strategyTactics, tacticName) {
             clearInterval(countdownInterval);
@@ -172,11 +204,12 @@
 
                             removerPDFdaTela();
 
-                            let button = document.createElement("button");
-                            button.id = "chat";
-                            button.innerText = "Entrar no Chat";
+                            // let button = document.createElement("button");
+                            // button.id = "chat";
+                            // button.innerText = "Entrar no Chat";
 
-                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            // button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+
                             id_chat = null;
                             for (let tatic_stra in strategyTactics) {
                                 // console.log(strategyTactics[tatic_stra].name);
@@ -186,13 +219,16 @@
                                 }
                             }
 
-                            button.onclick = function () {
-                                window.location.href = `/chat/${id_chat}/{{ session.id }}`;
-                            };
+                            if (taticaAtiva == false) {
+                                console.log("Entrando no debate sincrono");
+                                debateSicrono(id_chat);
+                                taticaAtiva = true;
+                            }
 
-                            let chat_here = document.getElementById("chat_here");
-
-                            chat_here.appendChild(button);
+                            // button.onclick = function () {
+                            //     window.location.href = `/chat/${id_chat}/{{ session.id }}`;
+                            // };   
+                            // chat_here.appendChild(button);
                         }
                     }
                     else if (tacticName == "Apresentacao Sincrona") {

@@ -101,9 +101,58 @@ def get_strategy_time(strategy_id):
 #     # return f'${chat_id}'
 #     return render_template('/strategies/chat.html', chat_id=chat_id)
 
-@strategy_bp.route('/chat/<int:chat_id>/<int:session_id>', methods=['GET'])
+# @strategy_bp.route('/chat/<int:chat_id>/<int:session_id>', methods=['GET'])
+# @token_required
+# def chat(chat_id, session_id, current_user=None):
+#     try:
+#         # A lógica para buscar usuários permanece a mesma
+#         response = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
+#         response.raise_for_status()
+        
+#         session_data = response.json()
+#         students = session_data.get("students", [])
+#         teachers = session_data.get("teachers", [])
+        
+        
+#         # Uma única chamada para buscar todos os nomes de uma vez é mais eficiente
+#         teachers = {'ids': teachers}
+#         students = {'ids': students}
+#         students_response = requests.get(f"{USER_URL}/students/ids_to_names", params=students)
+#         students_response.raise_for_status()
+#         teachers_response = requests.get(f"{USER_URL}/teachers/ids_to_names", params=teachers)
+#         teachers_response.raise_for_status()
+    
+#         estudante_users = students_response.json()['ids_with_names']
+#         professor_users = teachers_response.json()['ids_with_names']
+
+#         all_user_names = []
+
+#         for estudante in estudante_users:
+#             all_user_names.append(estudante)
+
+#         for professor in professor_users:
+#             all_user_names.append(professor)
+
+
+#         # Guarda o ID do usuário na sessão do Flask para uso nos sockets
+        
+#         session['user_id'] = current_user['id']
+#         session['username'] = current_user['name']
+
+#         session['all_users'] = json.dumps(all_user_names)
+        
+#         # Passa a lista de usuários e o usuário atual para o template
+#         return render_template(
+#             '/strategies/chat.html', 
+#             chat_id=chat_id, 
+#             current_user=current_user, 
+#             # all_users=all_users # Passa uma lista simples de usuários
+#         )
+#     except RequestException as e:
+#         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
+@strategy_bp.route('/chat_fragment/<int:chat_id>/<int:session_id>', methods=['GET'])
 @token_required
-def chat(chat_id, session_id, current_user=None):
+def chat_fragment(chat_id, session_id, current_user=None):
     try:
         # A lógica para buscar usuários permanece a mesma
         response = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
@@ -133,7 +182,6 @@ def chat(chat_id, session_id, current_user=None):
         for professor in professor_users:
             all_user_names.append(professor)
 
-
         # Guarda o ID do usuário na sessão do Flask para uso nos sockets
         
         session['user_id'] = current_user['id']
@@ -143,13 +191,13 @@ def chat(chat_id, session_id, current_user=None):
         
         # Passa a lista de usuários e o usuário atual para o template
         return render_template(
-            '/strategies/chat.html', 
+            '/strategies/chat_partial.html', 
             chat_id=chat_id, 
-            current_user=current_user, 
-            # all_users=all_users # Passa uma lista simples de usuários
+            current_user=current_user
         )
     except RequestException as e:
         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
+
 
 # --- EVENTOS SOCKET.IO ---
 
