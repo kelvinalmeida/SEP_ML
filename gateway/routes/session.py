@@ -22,7 +22,7 @@ def create_session(current_user=None):
                 "strategies": strategy_ids,
                 "teachers": teacher_ids,
                 "students": student_ids,
-                "domains": domains_ids,
+                "domains": domains_ids, 
             }
 
             response = requests.post(f"{CONTROL_URL}/sessions/create", json=data)

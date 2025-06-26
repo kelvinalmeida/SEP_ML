@@ -191,8 +191,8 @@ def get_general_messages(chat_id):
         return jsonify(chat.as_dict()), 200 
     return jsonify({"error": "Chat not found"}), 404
 
-@strategies_bp.route('/chat/<int:chat_id>/private_messages/<int:user1_id>/<int:user2_id>', methods=['GET'])
-def get_private_messages(chat_id, user1_id, user2_id):
+@strategies_bp.route('/chat/<int:chat_id>/private_messages/<string:myUsername>/<string:target_username>', methods=['GET'])
+def get_private_messages(chat_id, myUsername, target_username):
     """Retorna o histórico de mensagens entre dois usuários específicos."""
     chat = Message.query.get(chat_id)
     if not chat:
@@ -201,8 +201,8 @@ def get_private_messages(chat_id, user1_id, user2_id):
     messages = PrivateMessage.query.filter(
         PrivateMessage.message_id == chat_id,
         or_(
-            (PrivateMessage.sender_id == user1_id) & (PrivateMessage.receiver_id == user2_id),
-            (PrivateMessage.sender_id == user2_id) & (PrivateMessage.receiver_id == user1_id)
+            (PrivateMessage.username == myUsername) & (PrivateMessage.target_username == target_username),
+            (PrivateMessage.username == target_username) & (PrivateMessage.target_username == myUsername)
         )
     ).order_by(PrivateMessage.timestamp.asc()).all()
     
@@ -231,9 +231,9 @@ def add_priv_message(chat_id):
     data = request.json
     msg = PrivateMessage(
         sender_id=data.get('sender_id'),
-        receiver_id=data.get('receiver_id'),
         content=data.get('content'),
-        username=data.get('username') # Adicionando username
+        username=data.get('username'), # Adicionando username
+        target_username=data.get('target_username') # Adicionando target_username
     )
     chat.messages_privates.append(msg)
     # Não precisa de db.session.add(msg) por causa do cascade

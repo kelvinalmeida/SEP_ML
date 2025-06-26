@@ -54,8 +54,8 @@ class PrivateMessage(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, nullable=False)
-    receiver_id = db.Column(db.Integer, nullable=False)
     username = db.Column(db.String(80), nullable=False) # CAMPO ADICIONADO
+    target_username = db.Column(db.String(80), nullable=False) # CAMPO ADICIONADO
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -66,8 +66,8 @@ class PrivateMessage(db.Model):
         return {
             "id": self.id,
             "sender_id": self.sender_id,
-            "receiver_id": self.receiver_id,
             "username": self.username, # CAMPO ADICIONADO
+            "target_username": self.target_username, # CAMPO ADICIONADO
             "content": self.content,
             "timestamp": self.timestamp.isoformat()
         }

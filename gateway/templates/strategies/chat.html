@@ -296,16 +296,18 @@
                 // IDs dos participantes da mensagem
                 const user1 = message.sender_id;
                 const user2 = message.receiver_id;
-                const myId = parseInt("{{ current_user['id'] }}");
+                const myId = myUserId;
 
                 // Verifica se o usuário atual é um dos participantes
-                if (user1 === myId || user2 === myId) {
-                    const otherUserId = (user1 === myId) ? user2 : user1;
-                    const otherUsername = message.username; // Usamos o username que vem na mensagem
+                // Se o usuário atual é um dos participantes, abre a aba de chat privado
+                if (user1 == myId || user2 == myId) {
+                    // const otherUserId = (user1 === myId) ? user2 : user1;
+                    const senderId = message.sender_id;
+                    const reciver_id = message.username; // Usamos o username que vem na mensagem
 
                     // Abre a aba se não estiver aberta e exibe a mensagem
-                    openPrivateChat(otherUserId, otherUsername);
-                    addMessageToPane(`tab-pane-${otherUserId}`, message);
+                    openPrivateChat(senderId, reciver_id);
+                    addMessageToPane(`tab-pane-${message.receiver_id}`, message);
                 }
             });
 

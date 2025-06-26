@@ -42,6 +42,7 @@ def create_strategy():
                 tatics_with_time["chat_id"] = None
         
         strategy = {"name": name, "tatics": tatics_with_times}
+        # return jsonify(strategy)
         
         try:
             response = requests.post(f"{STRATEGIES_URL}/strategies/create", json=strategy)
@@ -244,11 +245,21 @@ def handle_load_private(data):
     chat_id = data.get('chat_id')
     user1_id = session.get('user_id')
     user2_id = data.get('with_user_id')
+    target_username = data.get('target_username')
+    myUsername = session.get('username')
+
+    # emit('private_messages_history', {
+    #     "username": session.get('username'),
+    #     "content": 'oiii'
+    #     }, to=chat_id)
+    
+    # return
     try:
-        response = requests.get(f"{STRATEGIES_URL}/chat/{chat_id}/private_messages/{user1_id}/{user2_id}")
+        response = requests.get(f"{STRATEGIES_URL}/chat/{chat_id}/private_messages/{myUsername}/{target_username}")
         response.raise_for_status()
+        print(response.json())
         # Envia o histórico de volta para o cliente que pediu
-        emit('private_messages_history', {'with_user_id': user2_id, 'messages': response.json()})
+        emit('private_messages_history', {'target_username': target_username, 'with_user_id': user2_id, 'messages': response.json()})
     except RequestException as e:
         emit('error', {"details": f"Não foi possível carregar o histórico privado: {str(e)}"})
         
@@ -274,13 +285,14 @@ def handle_private_message(data):
     chat_id = data.get('chat_id')
     sender_id = session.get('user_id')
     recipient_id = data.get('recipient_id')
-    recipient_name = data.get('recipient_name')
+    target_username = data.get('target_username')
+    # recipient_name = data.get('recipient_name')
 
     message_payload = {
         "sender_id": sender_id,
-        "receiver_id": int(recipient_id), # Garante que é int
         "content": data.get('content'),
-        "username": session.get('username') # Incluindo o nome de quem envia
+        "username": session.get('username'), # Incluindo o nome de quem envia
+        "target_username": target_username # Nome do destinatário
     }
     try:
         # Salva a mensagem privada na API

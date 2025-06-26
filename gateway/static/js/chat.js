@@ -1,5 +1,5 @@
 // Todo o JavaScript virá aqui
-console.log("Chat.js carregado!");
+// console.log("Chat.js carregado!");
 
 function initializeChatComponent() {
 
@@ -10,7 +10,7 @@ function initializeChatComponent() {
     const myUserId = window.myUserId;
     const chatId = window.chatId;
 
-    console.log(`Usuário atual: ${myUsername} (ID: ${myUserId}) no chat ${chatId}`);
+    // console.log(`Usuário atual: ${myUsername} (ID: ${myUserId}) no chat ${chatId}`);
 
     // Elementos da UI
     const userList = document.getElementById('user-list');
@@ -27,17 +27,18 @@ function initializeChatComponent() {
     /**
      * Cria e abre uma nova aba de chat privado
      * @param {string} userId - O ID do usuário com quem conversar
-     * @param {string} userName - O nome do usuário
+     * @param {string} recive_username - O nome do usuário
      */
-    function openPrivateChat(userId, userName) {
+    function openPrivateChat(myUsername, target_username) {
 
-        console.log(`Abrindo chat privado com ${userName} (ID: ${userId})`);
-        console.log(`Usuário atual: ${myUsername} (ID: ${myUserId})`);
-        console.log(userId == myUserId && userName == myUsername);
-
+        // console.log(`Abrindo chat privado com ${target_username} (ID: ${userId})`);
+        // console.log(`Usuário atual: ${myUsername} (ID: ${myUserId})`);
+        // console.log(userId == myUserId && target_username == myUsername);
         // Não abrir uma aba para se mesmo
-        if (userName == myUsername) {
-            // console.warn("Tentativa de abrir chat com si mesmo. Ignorando.");
+
+        // console.log("Abrindo chat privado com: target_username = ", myUsername == target_username, "(My ID:", userId, ")");
+        if (target_username == myUsername) {
+            console.warn("Tentativa de abrir chat com si mesmo. Ignorando.");
             return;
         }
 
@@ -45,9 +46,9 @@ function initializeChatComponent() {
         const tabButton = document.createElement('li');
         tabButton.className = 'nav-item';
         tabButton.innerHTML = `
-            <button class="nav-link"  id="tab-btn-${userId}" data-bs-toggle="tab" data-bs-target="#tab-pane-${userId}" type="button" role="tab" aria-controls="tab-pane-${userId}" aria-selected="false">
-                ${userName}
-                <span class="btn-close btn-close-sm ms-2" data-user-id="${userId}" aria-label="Close"></span>
+            <button class="nav-link"  id="tab-btn-${target_username}" data-bs-toggle="tab" data-bs-target="#tab-pane-${target_username}" type="button" role="tab" aria-controls="tab-pane-${target_username}" aria-selected="false">
+                ${target_username}
+                <span class="btn-close btn-close-sm ms-2" data-user-id="${target_username}" aria-label="Close"></span>
             </button>
         `;
         chatTabsList.appendChild(tabButton);
@@ -55,7 +56,7 @@ function initializeChatComponent() {
         // 2. Criar o painel de conteúdo da aba
         const tabPane = document.createElement('div');
         tabPane.className = 'tab-pane fade';
-        tabPane.id = `tab-pane-${userId}`;
+        tabPane.id = `tab-pane-${target_username}`;
         tabPane.role = 'tabpanel';
         tabPane.innerHTML = `<ul class="list-unstyled overflow-auto chat-messages" style="height: 60vh;"></ul>`; // Área para mensagens
         chatTabsContent.appendChild(tabPane);
@@ -63,13 +64,15 @@ function initializeChatComponent() {
 
         // 3. Adicionar ao estado e ativar a nova aba
 
-        openPrivateChats.add(userId);
+        openPrivateChats.add(target_username);
         const newTab = new bootstrap.Tab(tabButton.querySelector('button'));
         newTab.show();
 
         // 4. Pedir ao servidor o histórico de mensagens desta conversa privada
         socket.emit('load_private_messages', {
-            with_user_id: userId,
+            myUsername: myUsername,
+            target_username: target_username,
+            // with_user_id: userId,
             chat_id: chatId
         });
     }
@@ -80,14 +83,23 @@ function initializeChatComponent() {
      * @param {object} message - Objeto da mensagem {username, content}
      */
     function addMessageToPane(paneId, message) {
+        // console.log(`Adicionando mensagem ao painel ${paneId}: >>> `, message);
 
         const pane = document.getElementById(paneId);
         if (!pane) return;
+        // console.log('3 - oii >> ', pane);
 
         const messagesUl = pane.querySelector('.chat-messages');
+        // console.log(messagesUl);
         const item = document.createElement('li');
 
+        // console.log(item);
 
+        if (message.content == null || message.content == undefined) {
+            console.log(message.content, chatId);
+            console.warn("Mensagem sem conteúdo. Ignorando.");
+            return;
+        }
 
         if (message.content.includes("aviso -")) {
             item.className = `d-flex flex-column my-2 item-warning align-items-center green`;
@@ -97,11 +109,11 @@ function initializeChatComponent() {
             item.className = `d-flex flex-column my-2 ${message.username === myUsername ? 'align-items-end' : 'align-items-start'}`;
 
             item.innerHTML = `
-                                        <div class="m-3 message ${message.username === myUsername ? 'my-message' : 'other-message'}">
-                                            <span class="username">${message.username}</span>
-                                            <span>${message.content}</span>
-                                        </div>
-                                    `;
+            <div class="m-3 message ${message.username === myUsername ? 'my-message' : 'other-message'}">
+            <span class="username">${message.username}</span>
+            <span>${message.content}</span>
+            </div>
+            `;
         }
 
         messagesUl.appendChild(item);
@@ -113,11 +125,16 @@ function initializeChatComponent() {
     // Lidar com cliques na lista de usuários para abrir chats
     userList.addEventListener('click', function (e) {
         const userItem = e.target.closest('[data-user-id]');
-        console.log(userItem)
         if (userItem) {
-            const userId = userItem.dataset.userId;
-            const userName = userItem.dataset.userName;
-            openPrivateChat(userId, userName);
+            const receiveUserId = userItem.dataset.userId;
+            const receiveUserName = userItem.dataset.userName;
+            // console.log(`Clicou no usuário: ${receiveUserName} (ID: ${receiveUserId})`);
+
+            if (openPrivateChats.has(receiveUserName)) {
+                console.warn(`Aba Já aberta!`);
+            } else {
+                openPrivateChat(myUsername, receiveUserName);
+            }
         }
     });
 
@@ -126,17 +143,17 @@ function initializeChatComponent() {
         if (e.target.classList.contains('btn-close')) {
             e.stopPropagation(); // Impede que o clique ative a aba antes de fechar
 
-            const userId = e.target.dataset.userId;
-
+            const targetUsername = e.target.dataset.userId;
+            console.log(`targetUsername: ${targetUsername}`);
 
             // Remove o botão e o painel
-            const tabButton = document.querySelector(`#tab-btn-${userId}`).parentElement;
-            const tabPane = document.querySelector(`#tab-pane-${userId}`);
+            const tabButton = document.querySelector(`#tab-btn-${targetUsername}`).parentElement;
+            const tabPane = document.querySelector(`#tab-pane-${targetUsername}`);
             tabButton.remove();
             tabPane.remove();
 
             // Remove do estado
-            openPrivateChats.delete(userId);
+            openPrivateChats.delete(targetUsername);
 
             // Ativa a aba "Geral" por padrão
             const generalTab = new bootstrap.Tab(document.querySelector('#tab-btn-geral'));
@@ -152,21 +169,25 @@ function initializeChatComponent() {
 
         // Descobrir qual aba está ativa
         const activeTab = document.querySelector('#chat-tabs-list .nav-link.active');
-        const activeTabId = activeTab.id; // ex: 'tab-btn-geral' ou 'tab-btn-123'
+        const activeTabUsername = activeTab.id; // ex: 'tab-btn-geral' ou 'tab-btn-usename'
+        // console.log(">>>>>  ", activeTab)
 
-        if (activeTabId === 'tab-btn-geral') {
+        if (activeTabUsername === 'tab-btn-geral') {
             socket.emit('general_message', {
                 username: myUsername,
                 chat_id: chatId,
                 content: message
             });
         } else {
-            const targetUserId = activeTabId.replace('tab-btn-', '');
-            // console.log(`Enviando mensagem privada para o usuário ID: ${targetUserId}`);
+            const targetUsername = activeTabUsername.replace('tab-btn-', '');
+            // const targetUserName = 
+            // console.log(activeTab);
+            console.log(`Enviando mensagem privada para o usuário: ${targetUsername}`);
+            // console.log("1 - oiiii");
             socket.emit('private_message', {
                 username: myUsername,
+                target_username: targetUsername,
                 content: message,
-                recipient_id: targetUserId,
                 chat_id: chatId
             });
             // Adiciona a mensagem à sua própria tela imediatamente
@@ -188,17 +209,23 @@ function initializeChatComponent() {
         // IDs dos participantes da mensagem
         const user1 = message.sender_id;
         const user2 = message.receiver_id;
+        const myUsername = message.username; // Usamos o username que vem na mensagem
+        const target_username = message.target_username; // Nome do usuário que enviou a mensagem
         const myId = myUserId;
 
         // Verifica se o usuário atual é um dos participantes
-        if (user1 === myId || user2 === myId) {
-            const otherUserId = (user1 === myId) ? user2 : user1;
-            const otherUsername = message.username; // Usamos o username que vem na mensagem
+        // Se o usuário atual é um dos participantes, abre a aba de chat privado
+        // if (user1 == myId || user2 == myId) {
+        // console.log("if (user1 == myId || user2 == myId)");
+        // const otherUserId = (user1 === myId) ? user2 : user1;
+        // const senderId = message.sender_id;
+        // const reciver_id = message.username; // Usamos o username que vem na mensagem
 
-            // Abre a aba se não estiver aberta e exibe a mensagem
-            openPrivateChat(otherUserId, otherUsername);
-            addMessageToPane(`tab-pane-${otherUserId}`, message);
-        }
+        // Abre a aba se não estiver aberta e exibe a mensagem
+        // console.log(`Abrindo nova aba!`);
+        openPrivateChat(myUsername, target_username);
+        addMessageToPane(`tab-pane-${message.target_username}`, message);
+        // }
     });
 
     socket.on('update_user_list', function (userListDataString) {
@@ -249,17 +276,19 @@ function initializeChatComponent() {
         addMessageToPane('tab-pane-geral', message);
     });
 
-    socket.on('private_message', function (message) {
-        // A mensagem vem de 'sender_id'. O outro participante é você.
-        const otherUserId = message.sender_id;
-        console.log(">>>>>>>>>>>>>>>>>>>>>>> ")
-        // Abre a aba se não estiver aberta
-        openPrivateChat(otherUserId, message.username);
-        // Adiciona a mensagem
-        addMessageToPane(`tab-pane-${otherUserId}`, message);
-    });
+    // socket.on('private_message', function (message) {
+    //     // A mensagem vem de 'sender_id'. O outro participante é você.
+    //     const otherUserId = message.sender_id;
+    //     // console.log(">>>>>>>>>>>>>>>>>>>>>>> ")
+    //     // Abre a aba se não estiver aberta
+    //     console.log("oiiii")
+    //     openPrivateChat(otherUserId, message.username);
+    //     // Adiciona a mensagem
+    //     addMessageToPane(`tab-pane-${otherUserId}`, message);
+    // });
 
     socket.on('general_messages_history', function (messages) {
+        console.log('Carregando histórico de mensagens gerais...');
         console.log(messages);
         const pane = document.getElementById('tab-pane-geral');
         const messagesUl = pane.querySelector('.chat-messages');
@@ -272,12 +301,13 @@ function initializeChatComponent() {
     });
 
     socket.on('private_messages_history', function (data) {
-        const paneId = `tab-pane-${data.with_user_id}`;
+        const paneId = `tab-pane-${data.target_username}`;
         const pane = document.getElementById(paneId);
         if (!pane) return;
 
         const messagesUl = pane.querySelector('.chat-messages');
         messagesUl.innerHTML = ''; // Limpa antes de carregar
+        // console.log(">>> ", data)
         data.messages.forEach(msg => addMessageToPane(paneId, msg));
     });
 
