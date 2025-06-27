@@ -30,7 +30,7 @@ def get_students():
 def get_student_by_id(student_id):
     student = Student.query.get(student_id)
     if student:
-        return jsonify({"id": student.id, "name": student.name, "age": student.age, "course": student.course})
+        return jsonify({"id": student.id, "name": student.name, "age": student.age, "course": student.course, "username": student.username, "type": student.type})
     return jsonify({"error": "Aluno não encontrado"}), 404
 
 @student_bp.route("/students/<int:student_id>", methods=["PUT"])
@@ -54,7 +54,7 @@ def delete_student(student_id):
         return jsonify({"message": "Aluno deletado!"})
     return jsonify({"error": "Aluno não encontrado"}), 404
 
-@student_bp.route('/students/ids_to_names', methods=['GET'])
+@student_bp.route('/students/ids_to_usernames', methods=['GET'])
 def ids_to_names():
     ids = request.args.getlist('ids')
     
@@ -72,7 +72,7 @@ def ids_to_names():
     if not students:
         return jsonify({"error": "No students found"}), 404
 
-    result = { "names": [student.name for student in students],
-               "ids_with_names": [{"name": student.name, "id": student.id, 'type': 'estudante'} for student in students] }
+    result = { "usernames": [student.username for student in students],
+               "ids_with_usernames": [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students] }
 
     return jsonify(result), 200

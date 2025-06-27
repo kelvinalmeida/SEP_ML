@@ -122,12 +122,12 @@ def get_session_by_id(session_id, current_user=None):
         session["full_tatics_time"] = all_tatics_time.get("full_tactics_time") # Adiciona o tempo total de táticas à sessão
 
         teachers_params = { 'ids': session.get("teachers", [])}
-        teachers = requests.get(f"{USER_URL}/teachers/ids_to_names", params=teachers_params).json()
-        session["teachers"] = teachers["names"] 
+        teachers = requests.get(f"{USER_URL}/teachers/ids_to_usernames", params=teachers_params).json()
+        session["teachers"] = teachers["usernames"] 
 
         students_params = { 'ids': session.get("students", [])}
-        students = requests.get(f"{USER_URL}/students/ids_to_names", params=students_params).json()
-        session["students"] = students["names"] 
+        students = requests.get(f"{USER_URL}/students/ids_to_usernames", params=students_params).json()
+        session["students"] = students["usernames"] 
 
         domains_params = { 'ids': session.get("domains", [])}
         domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()

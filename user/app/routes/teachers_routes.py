@@ -33,7 +33,7 @@ def get_teachers():
 def get_teacher(teacher_id):
     teacher = Teacher.query.get(teacher_id)
     if teacher:
-        return jsonify({"id": teacher.id, "name": teacher.name, "age": teacher.age, "type": teacher.type})
+        return jsonify({"id": teacher.id, "name": teacher.name, "age": teacher.age, "type": teacher.type, "username": teacher.username})
     return jsonify({"error": "Professor não encontrado"}), 404
 
 @teachers_bp.route("/teachers/<int:teacher_id>", methods=["PUT"])
@@ -57,7 +57,7 @@ def delete_teacher(teacher_id):
     return jsonify({"error": "Professor não encontrado"}), 404
 
 
-@teachers_bp.route('/teachers/ids_to_names', methods=['GET'])
+@teachers_bp.route('/teachers/ids_to_usernames', methods=['GET'])
 def ids_to_names():
     ids = request.args.getlist('ids')
     
@@ -79,7 +79,7 @@ def ids_to_names():
     #     strategy.name
     #     for strategy in teachers ]
     
-    result = { "names": [teacher.name for teacher in teachers],
-               "ids_with_names": [{"name": teacher.name, "id": teacher.id, 'type': 'professor'} for teacher in teachers] }
+    result = { "usernames": [teacher.username for teacher in teachers],
+               "ids_with_usernames": [{"username": teacher.username, "id": teacher.id, 'type': 'professor'} for teacher in teachers] }
 
     return jsonify(result), 200

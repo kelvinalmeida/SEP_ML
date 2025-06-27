@@ -28,7 +28,7 @@ def login():
         try:
             response = requests.post(f"{USER_URL}/login", json={"username": username, "password": password})
             if response.status_code == 200:
-                token = response.json().get("token")
+                token = response.json().get("token") 
                 
                 # Criar resposta com cookie
                 resp = make_response(redirect(url_for('login.home_page')))  # exemplo

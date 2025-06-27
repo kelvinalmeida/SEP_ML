@@ -29,25 +29,29 @@ function initializeChatComponent() {
      * @param {string} userId - O ID do usuário com quem conversar
      * @param {string} recive_username - O nome do usuário
      */
-    function openPrivateChat(myUsername, target_username) {
+    function openPrivateChat(sender_username, target_username) {
 
         // console.log(`Abrindo chat privado com ${target_username} (ID: ${userId})`);
         // console.log(`Usuário atual: ${myUsername} (ID: ${myUserId})`);
         // console.log(userId == myUserId && target_username == myUsername);
         // Não abrir uma aba para se mesmo
 
-        // console.log("Abrindo chat privado com: target_username = ", myUsername == target_username, "(My ID:", userId, ")");
-        if (target_username == myUsername) {
-            console.warn("Tentativa de abrir chat com si mesmo. Ignorando.");
+        console.log(`bloqueando abrir novo chat: `, myUsername == target_username);
+        console.log(`abrindo chat privado com ${target_username} (meu username: ${myUsername})`);
+
+        if (target_username == myUsername || openPrivateChats.has(target_username)) {
+            console.warn("Chat já aberto ou tentativa de abrir consigo mesmo. Ignorando.");
             return;
         }
 
+        console.log("oiiii");
+        // console.log(`Abrindo chat privado com ${target_username} meu username: ${myUsername}`);
         // 1. Criar o botão da aba (com ícone de fechar)
         const tabButton = document.createElement('li');
         tabButton.className = 'nav-item';
         tabButton.innerHTML = `
             <button class="nav-link"  id="tab-btn-${target_username}" data-bs-toggle="tab" data-bs-target="#tab-pane-${target_username}" type="button" role="tab" aria-controls="tab-pane-${target_username}" aria-selected="false">
-                ${target_username}
+                ${target_username} - oi
                 <span class="btn-close btn-close-sm ms-2" data-user-id="${target_username}" aria-label="Close"></span>
             </button>
         `;
@@ -70,7 +74,7 @@ function initializeChatComponent() {
 
         // 4. Pedir ao servidor o histórico de mensagens desta conversa privada
         socket.emit('load_private_messages', {
-            myUsername: myUsername,
+            myUsername: sender_username,
             target_username: target_username,
             // with_user_id: userId,
             chat_id: chatId
@@ -128,7 +132,7 @@ function initializeChatComponent() {
         if (userItem) {
             const receiveUserId = userItem.dataset.userId;
             const receiveUserName = userItem.dataset.userName;
-            // console.log(`Clicou no usuário: ${receiveUserName} (ID: ${receiveUserId})`);
+            console.log(`Clicou no usuário: ${receiveUserName} (ID: ${receiveUserId})`);
 
             if (openPrivateChats.has(receiveUserName)) {
                 console.warn(`Aba Já aberta!`);
@@ -182,7 +186,7 @@ function initializeChatComponent() {
             const targetUsername = activeTabUsername.replace('tab-btn-', '');
             // const targetUserName = 
             // console.log(activeTab);
-            console.log(`Enviando mensagem privada para o usuário: ${targetUsername}`);
+            // console.log(`Enviando mensagem privada para o usuário: ${targetUsername}`);
             // console.log("1 - oiiii");
             socket.emit('private_message', {
                 username: myUsername,
@@ -206,27 +210,20 @@ function initializeChatComponent() {
     });
 
     socket.on('new_private_message', function (message) {
-        // IDs dos participantes da mensagem
-        const user1 = message.sender_id;
-        const user2 = message.receiver_id;
-        const myUsername = message.username; // Usamos o username que vem na mensagem
-        const target_username = message.target_username; // Nome do usuário que enviou a mensagem
-        const myId = myUserId;
+        const sender_username = message.username;
+        const target_username = message.target_username;
 
-        // Verifica se o usuário atual é um dos participantes
-        // Se o usuário atual é um dos participantes, abre a aba de chat privado
-        // if (user1 == myId || user2 == myId) {
-        // console.log("if (user1 == myId || user2 == myId)");
-        // const otherUserId = (user1 === myId) ? user2 : user1;
-        // const senderId = message.sender_id;
-        // const reciver_id = message.username; // Usamos o username que vem na mensagem
+        const isSender = myUsername === sender_username;
+        const otherUsername = isSender ? target_username : sender_username;
+        const paneId = `tab-pane-${otherUsername}`;
 
-        // Abre a aba se não estiver aberta e exibe a mensagem
-        // console.log(`Abrindo nova aba!`);
-        openPrivateChat(myUsername, target_username);
-        addMessageToPane(`tab-pane-${message.target_username}`, message);
-        // }
+        // Abrir o chat com o outro usuário (remetente ou destinatário)
+        openPrivateChat(myUsername, otherUsername);
+
+        // Adicionar a mensagem à aba correta
+        addMessageToPane(paneId, message);
     });
+
 
     socket.on('update_user_list', function (userListDataString) {
         console.log("Atualizando lista de usuários...");
@@ -241,18 +238,19 @@ function initializeChatComponent() {
 
         // 4. Agora, iteramos sobre o ARRAY 'parsedUsers', que é um array de verdade.
         parsedUsers.forEach(user => {
+            console.log("Adicionando usuário:", user);
             // Não mostra você mesmo na lista para iniciar chat
             // Certifique-se que 'myUserId' está definido e é um número ou string consistente com 'user.id'
-            if (user.name == myUsername && user.id == myUserId) return;
+            if (user.username == myUsername && user.id == myUserId) return;
 
             const item = document.createElement('a');
             item.href = '#';
             item.className = 'list-group-item list-group-item-action';
             item.dataset.userId = user.id;
-            item.dataset.userName = user.name;
+            item.dataset.userName = user.username;
 
             // Adiciona o tipo de usuário (Estudante/Professor) para ficar mais claro
-            item.textContent = `${user.name} (${user.type})`;
+            item.textContent = `${user.username} (${user.type})`;
 
             // 5. Adicionamos o novo elemento <a> ao elemento <ul> da página.
             userList.appendChild(item);
