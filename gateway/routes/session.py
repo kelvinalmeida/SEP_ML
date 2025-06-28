@@ -171,7 +171,7 @@ def start_session(session_id, current_user=None):
             return jsonify({"error": "Session already in progress"}), 400
         
         response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
-        return (response.text, response.status_code, response.headers.items())
+        return jsonify(response.json()), response.status_code
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
@@ -200,6 +200,9 @@ def get_current_tactic(session_id):
 
     if session_json['status'] != 'in-progress' or not session_json.get("start_time"):
         return jsonify({'message': 'Session not started'}), 400
+    
+    # if(session_response["status"] == 'finished'):
+    #     return jsonify({}), 200
 
     # Converter start_time para datetime (assumindo formato ISO 8601)
     start_time = datetime.strptime(session_json["start_time"], "%a, %d %b %Y %H:%M:%S %Z")
@@ -234,7 +237,8 @@ def get_current_tactic(session_id):
                 },
                 'remaining_time': int(remaining),
                 'elapsed_time': int(elapsed_time),
-                'strategy_tactics': tactics
+                'strategy_tactics': tactics,
+                'session_status': session_json['status'],
             })
 
         total_elapsed += duration

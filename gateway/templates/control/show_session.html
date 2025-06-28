@@ -144,6 +144,7 @@
     <script>
         let countdownInterval = null;
         let taticaAtiva = false;
+        let reloadPage = false;
 
 
         function debateSicrono(id_chat) {
@@ -335,20 +336,34 @@
             }
         }
 
+        function realod_page() {
+            if (reloadPage) {
+                console.log("Recarregando a página...");
+                location.reload();
+            }
+
+            reloadPage = false;
+        }
+
         function fetchCurrentTactic(sessionId) {
             fetch(`/sessions/${sessionId}/current_tactic`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.tactic) {
+                    console.log("Dados da tática atual: ", data);
+                    if (data.tactic && data.session_status == 'in-progress') {
+                        // console.log("Tática atual: ", data);
                         document.getElementById("tacticName").innerText = data.tactic.name;
                         startCountdown(data.remaining_time, data.strategy_tactics, data.tactic.name);
                     } else {
                         document.getElementById("tacticName").innerText = "Sessão finalizada";
                         document.getElementById("tacticTimer").innerText = "--";
                         clearInterval(countdownInterval);
+                        // reloadPage = true;
+                        // realod_page();
                     }
                 })
-                .catch(() => {
+                .catch((e) => {
+                    console.log("Erro ao buscar tática atual: ", e);
                     document.getElementById("tacticName").innerText = "Erro ao carregar";
                     document.getElementById("tacticTimer").innerText = "--";
                 });
@@ -356,15 +371,45 @@
 
         // Inicia a sessão ao clicar
         document.getElementById("startSessionBtn").addEventListener("click", () => {
+            // console.log("Iniciando a sessão");
             fetch(`/sessions/start/{{ session.id }}`)
                 .then(response => {
+                    console.log(response);
                     if (response.ok) {
+                        // console.log(response)
                         fetchCurrentTactic("{{ session.id }}");
                     } else {
                         alert("Sessão já iniciada ou erro ao iniciar.");
                     }
                 });
         });
+
+
+        document.getElementById("endSessionBtn").addEventListener("click", () => {
+            const confirmEnd = prompt("Tem certeza que deseja encerrar a sessão? Digite 'sim' para confirmar.");
+
+            if (confirmEnd && confirmEnd.trim().toLowerCase() === "sim") {
+                console.log("Encerrando a sessão");
+
+                fetch(`/sessions/end/{{ session.id }}`)
+                    .then(response => {
+                        if (response.ok) {
+                            console.log("Sessão encerrada com sucesso");
+                            location.reload(); // só recarrega após sucesso
+                        } else {
+                            alert("Erro ao encerrar a sessão.");
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Erro na requisição:", err);
+                        alert("Erro ao tentar encerrar a sessão.");
+                    });
+
+            } else {
+                alert("Encerramento cancelado.");
+            }
+        });
+
 
         // Verificação periódica de nova tática
         fetchCurrentTactic("{{ session.id }}");
