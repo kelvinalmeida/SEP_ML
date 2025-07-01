@@ -67,8 +67,8 @@
 
                     <div>
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
-                        <div id="tacticTimer" class="badge bg-dark">--</div>
-                        <div id="chat_here"></div>
+                        <div id="tacticTimer" class="badge bg-dark my-3">--</div>
+                        <div id="tatic_here"></div>
 
                         <div id="pdf_data" data-pdfs='{{ session.domains[0].pdfs | tojson | safe }}'></div>
                     </div>
@@ -144,15 +144,29 @@
     <script>
         let countdownInterval = null;
         let taticaAtiva = false;
-        let reloadPage = false;
+
+        let debateSicrono_isActive = false;
+        let apresentacaoSicrona_isActive = false;
+        let reuso_isActive = false;
+        let envio_informacao_isActive = false;
+
+
+        function qual_tatica_esta_ativa(debate_sicrono, apresentacao_sincrona, reuso, envio_informacao) {
+            debateSicrono_isActive = debate_sicrono;
+            apresentacaoSicrona_isActive = apresentacao_sincrona;
+            reuso_isActive = reuso;
+            envio_informacao_isActive = envio_informacao;
+            // console.log("Tática Ativa: ", debateSicrono, apresentacaoSicrona, reuso);
+        }
 
 
         function debateSicrono(id_chat) {
             fetch(`/chat_fragment/${id_chat}/{{ session.id }}`)
                 .then(response => response.text())
                 .then(html => {
-                    const chatHere = document.getElementById("chat_here");
+                    const chatHere = document.createElement("div");
                     chatHere.innerHTML = html;
+                    chatHere.id = "debate_sicrono";
 
                     // Reexecutar scripts
                     chatHere.querySelectorAll("script").forEach(oldScript => {
@@ -173,6 +187,10 @@
                             document.body.appendChild(newScript);
                         }
                     });
+
+                    const chatContainer = document.getElementById("tatic_here");
+                    chatContainer.innerHTML = ""; // Limpa o conteúdo anterior
+                    chatContainer.appendChild(chatHere);
                 });
         }
 
@@ -187,7 +205,11 @@
                     document.getElementById("tacticTimer").innerText = "Concluído";
                     fetchCurrentTactic("{{ session.id }}"); // Pega próxima tática
                 } else {
-                    document.getElementById("tacticTimer").innerText = `${timeLeft}s restantes`;
+                    let minutes = Math.floor(timeLeft / 60);
+                    let seconds = timeLeft % 60;
+                    let formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                    document.getElementById("tacticTimer").innerText = formattedTime;
+
 
                     timeLeft--;
 
@@ -203,13 +225,9 @@
                         // Evitar adicionar o botão várias vezes:
                         if (!document.getElementById("chat")) {
 
-                            removerPDFdaTela();
+                            qual_tatica_esta_ativa(true, false, false);
 
-                            // let button = document.createElement("button");
-                            // button.id = "chat";
-                            // button.innerText = "Entrar no Chat";
-
-                            // button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            removerElemento();
 
                             id_chat = null;
                             for (let tatic_stra in strategyTactics) {
@@ -225,21 +243,18 @@
                                 debateSicrono(id_chat);
                                 taticaAtiva = true;
                             }
-
-                            // button.onclick = function () {
-                            //     window.location.href = `/chat/${id_chat}/{{ session.id }}`;
-                            // };   
-                            // chat_here.appendChild(button);
                         }
                     }
                     else if (tacticName == "Apresentacao Sincrona") {
                         if (!document.getElementById("chat")) {
 
-                            removerPDFdaTela();
+                            qual_tatica_esta_ativa(false, true, false);
+                            removerElemento();
 
                             let button = document.createElement("button");
                             button.id = "chat";
                             button.innerText = "Entrar na Apresentação Síncrona";
+                            button.id = "apresentacao_sincrona";
 
                             button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
                             link_do_meet = null;
@@ -255,14 +270,17 @@
                                 window.open(link_do_meet, "_blank");
                             };
 
-                            let chat_here = document.getElementById("chat_here");
+                            let tatic_here = document.getElementById("tatic_here");
 
-                            chat_here.appendChild(button);
+                            tatic_here.appendChild(button);
                         }
                     }
                     else if (tacticName == "Reuso") {
 
                         if (!document.getElementById("pdf_container")) {
+
+                            qual_tatica_esta_ativa(false, false, true);
+                            removerElemento();
 
                             let pdfContainer = document.createElement("div");
                             pdfContainer.id = "pdf_container";
@@ -298,15 +316,16 @@
                                     });
                             });
 
-                            let chat_here = document.getElementById("chat_here");
-                            chat_here.appendChild(pdfContainer);
+                            let tatic_here = document.getElementById("tatic_here");
+                            tatic_here.appendChild(pdfContainer);
                         }
                     }
 
                     else if (tacticName == "Envio de Informacao") {
                         if (!document.getElementById("chat")) {
 
-                            removerPDFdaTela();
+                            qual_tatica_esta_ativa(false, false, false, true);
+                            removerElemento();
 
                             let button = document.createElement("button");
                             button.id = "chat";
@@ -319,9 +338,9 @@
                                 window.open(link, "_blank");
                             };
 
-                            let chat_here = document.getElementById("chat_here");
+                            let tatic_here = document.getElementById("tatic_here");
 
-                            chat_here.appendChild(button);
+                            tatic_here.appendChild(button);
                         }
                     }
                 }
@@ -329,20 +348,26 @@
             }, 1000);
         }
 
-        function removerPDFdaTela() {
+        function removerElemento() {
             let existingPdfContainer = document.getElementById("pdf_container");
-            if (existingPdfContainer) {
+            if (existingPdfContainer && !reuso_isActive) {
                 existingPdfContainer.remove();
+            }
+
+            let apresentacao_sincrona = document.getElementById("apresentacao_sincrona");
+            if (apresentacao_sincrona && !apresentacaoSicrona_isActive) {
+                apresentacao_sincrona.remove();
+            }
+
+            let chatElement = document.getElementById("debate_sicrono");
+            if (chatElement && !debateSicrono_isActive) {
+                chatElement.remove();
             }
         }
 
         function realod_page() {
-            if (reloadPage) {
-                console.log("Recarregando a página...");
-                location.reload();
-            }
-
-            reloadPage = false;
+            console.log("Recarregando a página...");
+            location.reload();
         }
 
         function fetchCurrentTactic(sessionId) {
@@ -351,15 +376,15 @@
                 .then(data => {
                     console.log("Dados da tática atual: ", data);
                     if (data.tactic && data.session_status == 'in-progress') {
-                        // console.log("Tática atual: ", data);
                         document.getElementById("tacticName").innerText = data.tactic.name;
                         startCountdown(data.remaining_time, data.strategy_tactics, data.tactic.name);
                     } else {
                         document.getElementById("tacticName").innerText = "Sessão finalizada";
                         document.getElementById("tacticTimer").innerText = "--";
+                        qual_tatica_esta_ativa(false, false, false, false);
+                        removerElemento();
                         clearInterval(countdownInterval);
-                        // reloadPage = true;
-                        // realod_page();
+
                     }
                 })
                 .catch((e) => {
@@ -368,6 +393,7 @@
                     document.getElementById("tacticTimer").innerText = "--";
                 });
         }
+
 
         // Inicia a sessão ao clicar
         document.getElementById("startSessionBtn").addEventListener("click", () => {
@@ -413,7 +439,10 @@
 
         // Verificação periódica de nova tática
         fetchCurrentTactic("{{ session.id }}");
+
+
         setInterval(() => fetchCurrentTactic("{{ session.id }}"), 15000);
+
     </script>
 
 </body>
