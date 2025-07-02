@@ -246,20 +246,25 @@
                         }
                     }
                     else if (tacticName == "Apresentacao Sincrona") {
-                        if (!document.getElementById("chat")) {
+                        if (!document.getElementById("apresentacao_sincrona")) {
 
-                            qual_tatica_esta_ativa(false, true, false);
+                            qual_tatica_esta_ativa(false, true, false, false);
                             removerElemento();
 
                             let button = document.createElement("button");
-                            button.id = "chat";
-                            button.innerText = "Entrar na Apresentação Síncrona";
+                            button.innerHTML = `
+            <span style="font-size: 1.5rem; font-weight: bold;">
+                🎥 Entrar na Apresentação Síncrona
+            </span>
+        `;
                             button.id = "apresentacao_sincrona";
 
-                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            // Adicionando múltiplas classes do Bootstrap para destaque visual
+                            button.className = "btn btn-warning shadow-lg border-3 border-dark mt-4 py-4 px-5 fs-4 rounded-pill";
+
                             link_do_meet = null;
+
                             for (let tatic_stra in strategyTactics) {
-                                // console.log(strategyTactics[tatic_stra].name);
                                 if (strategyTactics[tatic_stra].name == "Apresentacao Sincrona") {
                                     link_do_meet = strategyTactics[tatic_stra].description;
                                     break;
@@ -271,10 +276,10 @@
                             };
 
                             let tatic_here = document.getElementById("tatic_here");
-
                             tatic_here.appendChild(button);
                         }
                     }
+
                     else if (tacticName == "Reuso") {
 
                         if (!document.getElementById("pdf_container")) {
@@ -327,22 +332,41 @@
                             qual_tatica_esta_ativa(false, false, false, true);
                             removerElemento();
 
-                            let button = document.createElement("button");
-                            button.id = "chat";
-                            button.innerText = "Agora será enviado um material para o email cadastrado! Por favor, verifique! clique para ir para o email";
+                            // Criar container visual com mensagem e botão
+                            const avisoDiv = document.createElement("div");
+                            avisoDiv.id = "chat";
+                            avisoDiv.className = "alert alert-info shadow-lg p-4 rounded border border-primary";
 
-                            button.className = "btn btn-primary mt-3"; // (opcional) Adicione classes de estilo
+                            avisoDiv.innerHTML = `
+            <h4 class="mb-3 text-primary">
+                📬 Verifique seu e-mail!
+            </h4>
+            <p class="lead mb-4">
+                Acabamos de enviar um material importante para o e-mail cadastrado.
+                Por favor, confira sua caixa de entrada!
+            </p>
+            <button class="btn btn-success btn-lg px-4 py-2 rounded-pill fw-bold" id="btn_ver_email_gmail">
+                Ir para o Gmail ✉️
+            </button>
+            <button class="btn btn-success btn-lg px-4 py-2 rounded-pill fw-bold" id="btn_ver_email_outlook">
+                Ir para o Outlook ✉️
+            </button>
+        `;
 
-                            button.onclick = function () {
-                                let link = `https://mail.google.com/`;
-                                window.open(link, "_blank");
+                            // Adicionar ação ao botão
+                            avisoDiv.querySelector("#btn_ver_email_gmail").onclick = function () {
+                                window.open("https://mail.google.com/", "_blank");
+                            };
+
+                            avisoDiv.querySelector("#btn_ver_email_outlook").onclick = function () {
+                                window.open("https://outlook.live.com/", "_blank");
                             };
 
                             let tatic_here = document.getElementById("tatic_here");
-
-                            tatic_here.appendChild(button);
+                            tatic_here.appendChild(avisoDiv);
                         }
                     }
+
                 }
 
             }, 1000);
