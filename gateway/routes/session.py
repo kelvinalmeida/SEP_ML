@@ -22,7 +22,7 @@ def create_session(current_user=None):
                 "strategies": strategy_ids,
                 "teachers": teacher_ids,
                 "students": student_ids,
-                "domains": domains_ids,
+                "domains": domains_ids, 
             }
 
             response = requests.post(f"{CONTROL_URL}/sessions/create", json=data)
@@ -115,23 +115,23 @@ def get_session_by_id(session_id, current_user=None):
 
         params = { 'ids': session.get("strategies", []) }
         strategies = requests.get(f"{STRATEGIES_URL}/strategies/ids_to_names", params=params).json()
-        session["strategies"] = strategies
-
+        session["strategies"] = strategies  # Adiciona os nomes das estratégias à sessão
+    
 
         all_tatics_time = requests.get(f"{STRATEGIES_URL}/strategies/full_tatics_time", params=params).json()
         session["full_tatics_time"] = all_tatics_time.get("full_tactics_time") # Adiciona o tempo total de táticas à sessão
 
         teachers_params = { 'ids': session.get("teachers", [])}
-        teachers = requests.get(f"{USER_URL}/teachers/ids_to_names", params=teachers_params).json()
-        session["teachers"] = teachers
+        teachers = requests.get(f"{USER_URL}/teachers/ids_to_usernames", params=teachers_params).json()
+        session["teachers"] = teachers["usernames"] 
 
         students_params = { 'ids': session.get("students", [])}
-        students = requests.get(f"{USER_URL}/students/ids_to_names", params=students_params).json()
-        session["students"] = students
+        students = requests.get(f"{USER_URL}/students/ids_to_usernames", params=students_params).json()
+        session["students"] = students["usernames"] 
 
         domains_params = { 'ids': session.get("domains", [])}
         domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()
-        session["domains"] = domains
+        session["domains"] = domains 
 
         # return f"{session}"
         return render_template("control/show_session.html", session=session, current_user=current_user)
@@ -171,7 +171,7 @@ def start_session(session_id, current_user=None):
             return jsonify({"error": "Session already in progress"}), 400
         
         response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
-        return (response.text, response.status_code, response.headers.items())
+        return jsonify(response.json()), response.status_code
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
@@ -200,6 +200,9 @@ def get_current_tactic(session_id):
 
     if session_json['status'] != 'in-progress' or not session_json.get("start_time"):
         return jsonify({'message': 'Session not started'}), 400
+    
+    # if(session_response["status"] == 'finished'):
+    #     return jsonify({}), 200
 
     # Converter start_time para datetime (assumindo formato ISO 8601)
     start_time = datetime.strptime(session_json["start_time"], "%a, %d %b %Y %H:%M:%S %Z")
@@ -234,7 +237,8 @@ def get_current_tactic(session_id):
                 },
                 'remaining_time': int(remaining),
                 'elapsed_time': int(elapsed_time),
-                'strategy_tactics': tactics
+                'strategy_tactics': tactics,
+                'session_status': session_json['status'],
             })
 
         total_elapsed += duration
