@@ -157,7 +157,7 @@ def delete_session(session_id, current_user=None):
 def get_session_status(session_id, current_user=None):
     try:
         response = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}")
-        return (response.text, response.status_code, response.headers.items())
+        return jsonify(response.json()), response.status_code
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
