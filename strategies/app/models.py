@@ -46,6 +46,7 @@ class Message(db.Model):
             "messages": self.messages,
             # Mapeia cada objeto PrivateMessage para o seu formato de dicionário
             "messages_privates": [pm.as_dict() for pm in self.messages_privates]
+
         }
 
 
