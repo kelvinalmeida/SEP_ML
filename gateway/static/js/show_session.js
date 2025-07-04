@@ -344,8 +344,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     setInterval(() => fetchCurrentTactic(session_id), 15000);
                 }
             })
-
-
     }
 
     iniciarChat();

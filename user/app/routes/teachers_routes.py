@@ -83,3 +83,16 @@ def ids_to_names():
                "ids_with_usernames": [{"username": teacher.username, "id": teacher.id, 'type': 'professor'} for teacher in teachers] }
 
     return jsonify(result), 200
+
+
+
+@teachers_bp.route('/teachers/all_teachers_usernames', methods=['GET'])
+def all_teachers_usernames():
+    teachers = Teacher.query.all()
+    
+    if not teachers:
+        return jsonify({"error": "No teachers found"}), 404
+
+    usernames = [teacher.username for teacher in teachers]
+    
+    return jsonify({"usernames": usernames}), 200

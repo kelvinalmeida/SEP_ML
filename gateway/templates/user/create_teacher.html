@@ -18,26 +18,32 @@
                 <form method="POST">
                     <div class="mb-3">
                         <label for="name" class="form-label">Nome</label>
-                        <input type="text" class="form-control" id="name" name="name" placeholder="Digite o nome"
-                            required>
+                        <input type="text" class="form-control" id="name" name="name"
+                            value="{{ request.form.get('name', '') }}" placeholder="Digite o nome" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="age" class="form-label">Idade</label>
-                        <input type="number" class="form-control" id="age" name="age" placeholder="Digite a idade"
-                            required>
+                        <input type="number" class="form-control" id="age" name="age"
+                            value="{{ request.form.get('age', '') }}" placeholder="Digite a idade" required>
                     </div>
 
                     <div class="mb-3">
-                        <label for="username" class="form-label">Usuário</label>
-                        <input type="text" class="form-control" id="username" name="username"
-                            placeholder="Digite o nome de usuário" required>
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control is-invalid" id="username" name="username"
+                            value="{{ request.form.get('username', '') }}" required>
+
+                        {% if error %}
+                        <div class="invalid-feedback">
+                            {{ error }}
+                        </div>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label for="password" class="form-label">Senha</label>
                         <input type="password" class="form-control" id="password" name="password"
-                            placeholder="Digite a senha" required>
+                            value="{{ request.form.get('password', '') }}" placeholder="Digite a senha" required>
                     </div>
 
                     <div class="d-grid gap-2">

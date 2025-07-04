@@ -13,6 +13,7 @@ def create_student():
         type = "student"
         username = request.json["username"]
         password = request.json["password"]
+        # email = request.json["email"]
 
         student = Student(name=name, age=age, course=course, type=type, username=username, password_hash=password)
         db.session.add(student)
@@ -76,3 +77,16 @@ def ids_to_names():
                "ids_with_usernames": [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students] }
 
     return jsonify(result), 200
+
+
+@student_bp.route('/students/all_students_usernames', methods=['GET'])
+def all_students_usernames():
+    students = Student.query.all()
+    
+    if not students:
+        return jsonify({"error": "No students found"}), 404
+
+    usernames = [student.username for student in students]
+    # ids_with_usernames = [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students]
+
+    return jsonify({"usernames": usernames}), 200

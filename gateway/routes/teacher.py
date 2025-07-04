@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from requests.exceptions import RequestException
 
 import requests
@@ -20,10 +20,19 @@ def create_teacher():
         teacher = {"name": name, "age": age, "type": type, "username": username, "password": password}
         
         try:
+            all_students_usernames = requests.get(f"{USER_URL}/students/all_students_usernames").json()
+            all_teachers_usernames = requests.get(f"{USER_URL}/teachers/all_teachers_usernames").json()
+            
+            # return f"{all_students_usernames} {all_teachers_usernames}"
+            if username in all_students_usernames["usernames"] or username in all_teachers_usernames["usernames"]:
+                return render_template("./user/create_teacher.html", error="Username already exists")
+
+
             response = requests.post(f"{USER_URL}/teachers/create", json=teacher)
             if response.status_code == 200:
-                json_response = response.json()
-                return jsonify(json_response), 200
+                # json_response = response.json()
+                # return jsonify(json_response), 200
+                return redirect(url_for("login.home_page"))
             else:
                 return jsonify({"error": "Failed to create teacher", "details": response.text}), response.status_code
         except RequestException as e:
