@@ -14,17 +14,35 @@ def create_teacher():
         name = request.form["name"]
         age = request.form["age"]
         type = "teacher"
+        email = request.form["email"]
         username = request.form["username"]
         password = request.form["password"]
 
-        teacher = {"name": name, "age": age, "type": type, "username": username, "password": password}
+        teacher = {"name": name, "age": age, "type": type, 'email': email, "username": username, "password": password}
         
         try:
-            all_students_usernames = requests.get(f"{USER_URL}/students/all_students_usernames").json()
-            all_teachers_usernames = requests.get(f"{USER_URL}/teachers/all_teachers_usernames").json()
-            
-            # return f"{all_students_usernames} {all_teachers_usernames}"
-            if username in all_students_usernames["usernames"] or username in all_teachers_usernames["usernames"]:
+            # Requisições
+            students_response = requests.get(f"{USER_URL}/students/all_students_usernames")
+            teachers_response = requests.get(f"{USER_URL}/teachers/all_teachers_usernames")
+
+            # Verifique se deu certo
+            if students_response.status_code != 200 or teachers_response.status_code != 200:
+                return jsonify({
+                    "error": "Erro ao verificar usernames",
+                    "details": {
+                        "students_status": students_response.status_code,
+                        "teachers_status": teachers_response.status_code
+                    }
+                }), 503
+
+            all_students_usernames = students_response.json()
+            all_teachers_usernames = teachers_response.json()
+
+            # Verifique se as chaves existem
+            students_usernames = all_students_usernames.get("usernames", [])
+            teachers_usernames = all_teachers_usernames.get("usernames", [])
+
+            if username in students_usernames or username in teachers_usernames:
                 return render_template("./user/create_teacher.html", error="Username already exists")
 
 
@@ -32,7 +50,7 @@ def create_teacher():
             if response.status_code == 200:
                 # json_response = response.json()
                 # return jsonify(json_response), 200
-                return redirect(url_for("login.home_page"))
+                return render_template("./user/success.html")
             else:
                 return jsonify({"error": "Failed to create teacher", "details": response.text}), response.status_code
         except RequestException as e:

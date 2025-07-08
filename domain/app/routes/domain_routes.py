@@ -21,11 +21,18 @@ def create_domain():
 
     name = request.form.get('name')
     description = request.form.get('description')
-    files = request.files.getlist('pdfs')
+    files = request.files.getlist("pdfs")
+
 
     new_domain = Domain(name=name, description=description)
     db.session.add(new_domain)
     db.session.commit()
+
+    print("FILES RECEBIDOS:")
+    print(files)
+    for f in files:
+        print(f.filename)
+
 
     for file in files:
         if file and file.filename.endswith('.pdf'):
@@ -35,8 +42,6 @@ def create_domain():
 
             pdf = PDF(filename=filename, path=path, domain_id=new_domain.id)
             db.session.add(pdf)
-        else:
-            return jsonify({"message": "Domain not created."}), 400
 
     db.session.commit()
     return jsonify({"message": "Domain created successfully!"}), 200

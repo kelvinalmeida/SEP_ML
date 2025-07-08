@@ -13,10 +13,11 @@ def create_teacher():
         name = request.json["name"]
         age = request.json["age"]
         type = "teacher"
+        email = request.json["email"]
         username = request.json["username"]
         password = request.json["password"]
 
-        teacher = Teacher(name=name, age=age, type=type, username=username, password_hash=password)
+        teacher = Teacher(name=name, age=age, type=type, email=email, username=username, password_hash=password)
         db.session.add(teacher)
         db.session.commit()
         return jsonify({"message": "Professor criado com sucesso!"}), 200  # Retorna uma mensagem de sucesso
@@ -60,29 +61,24 @@ def delete_teacher(teacher_id):
 @teachers_bp.route('/teachers/ids_to_usernames', methods=['GET'])
 def ids_to_names():
     ids = request.args.getlist('ids')
+    # if not teachers:
+    #     return jsonify({"error": "No teachers found"}), 404
     
-    if not ids:
-        return jsonify({"error": "No IDs provided"}), 400
-
     try:
         # converte todos os ids para inteiros
         ids = list(map(int, ids))
-    except ValueError:
-        return jsonify({"error": "IDs must be integers"}), 400
+        teachers = Teacher.query.filter(Teacher.id.in_(ids)).all()
+        
+        result = { "usernames": [teacher.username for teacher in teachers],
+                "ids_with_usernames": [{"username": teacher.username, "id": teacher.id, 'type': 'professor'} for teacher in teachers] }
 
-    teachers = Teacher.query.filter(Teacher.id.in_(ids)).all()
-
-    if not teachers:
-        return jsonify({"error": "No teachers found"}), 404
-
-    # result = [ 
-    #     strategy.name
-    #     for strategy in teachers ]
+        return jsonify(result), 200
     
-    result = { "usernames": [teacher.username for teacher in teachers],
-               "ids_with_usernames": [{"username": teacher.username, "id": teacher.id, 'type': 'professor'} for teacher in teachers] }
+    except ValueError:
+        result = { "usernames": [],
+               "ids_with_usernames": [{"username": 'ND', "id": 'ND', 'type': 'estudante'}] }
+        return jsonify(result), 200
 
-    return jsonify(result), 200
 
 
 
@@ -90,8 +86,8 @@ def ids_to_names():
 def all_teachers_usernames():
     teachers = Teacher.query.all()
     
-    if not teachers:
-        return jsonify({"error": "No teachers found"}), 404
+    # if not teachers:
+    #     return jsonify({"error": "No teachers found"}), 404
 
     usernames = [teacher.username for teacher in teachers]
     

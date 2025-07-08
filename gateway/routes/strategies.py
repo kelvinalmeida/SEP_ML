@@ -47,8 +47,8 @@ def create_strategy():
         try:
             response = requests.post(f"{STRATEGIES_URL}/strategies/create", json=strategy)
             if response.status_code == 200:
-                json_response = response.json()
-                return jsonify(json_response), 200
+                # json_response = response.json()
+                return render_template("./strategies/success.html")
             else:
                 return jsonify({"error": "Failed to create strategy", "details": response.text}), response.status_code
         except RequestException as e:

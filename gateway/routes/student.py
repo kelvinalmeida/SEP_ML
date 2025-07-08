@@ -15,10 +15,11 @@ def create_students():
         age = request.form["age"]
         course = request.form["course"]
         type = "student"
+        email = request.form["email"]
         username = request.form["username"]
         password = request.form["password"]
 
-        student = {"name": name, "age": age, "course": course, "type": type, "username": username, "password": password}
+        student = {"name": name, "age": age, "course": course, "type": type, 'email': email, "username": username, "password": password}
         
         try:
             all_students_usernames = requests.get(f"{USER_URL}/students/all_students_usernames").json()
@@ -32,7 +33,7 @@ def create_students():
             if response.status_code == 200:
                 # json_response = response.json()
                 # return jsonify(json_response), 200
-                return redirect(url_for("login.home_page"))
+                return render_template("./user/success.html")
 
             else:
                 return jsonify({"error": "Failed to create student", "details": response.text}), response.status_code

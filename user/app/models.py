@@ -8,7 +8,7 @@ class Student(db.Model):
     course = db.Column(db.String(100))
     type = db.Column(db.String(20))
     username = db.Column(db.String(80), unique=True, nullable=True)
-    # email = db.Column(db.String(80), unique=True, nullable=True)
+    email = db.Column(db.String(80), unique=True, nullable=True)
     password_hash = db.Column(db.String(128), nullable=True)
 
     def set_password(self, password):
@@ -24,7 +24,7 @@ class Teacher(db.Model):
     age = db.Column(db.Integer, nullable=False, server_default="0")
     type = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=True)
-    # email = db.Column(db.String(80), unique=True, nullable=True)
+    email = db.Column(db.String(80), unique=True, nullable=True)
     password_hash = db.Column(db.String(128), nullable=True)
 
     def set_password(self, password):
