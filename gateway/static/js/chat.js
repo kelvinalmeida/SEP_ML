@@ -51,7 +51,7 @@ function initializeChatComponent() {
         tabButton.className = 'nav-item';
         tabButton.innerHTML = `
             <button class="nav-link"  id="tab-btn-${target_username}" data-bs-toggle="tab" data-bs-target="#tab-pane-${target_username}" type="button" role="tab" aria-controls="tab-pane-${target_username}" aria-selected="false">
-                ${target_username} - oi
+                ${target_username}
                 <span class="btn-close btn-close-sm ms-2" data-user-id="${target_username}" aria-label="Close"></span>
             </button>
         `;

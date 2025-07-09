@@ -72,7 +72,7 @@ def get_domain(current_user=None, domain_id=None):
         domain = None
 
     
-    return f"{domain}"
+    # return f"{domain}"
 
     return render_template("/domain/domain_detail.html", domain=domain)
     # return jsonify(domain), 200  # Retorna os detalhes do domínio em formato JSON

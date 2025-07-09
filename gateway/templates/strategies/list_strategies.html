@@ -34,12 +34,17 @@
                         <div class="d-flex justify-content-between align-items-center flex-wrap">
                             <div>
                                 <strong>{{ tatic.name }}</strong>
+                                {% if tatic.description != 'hidden' %}
                                 <div class="text-muted small">Descrição: {{ tatic.description }}</div>
-                                {% if tatic.chat_id %}
+                                {% else %}
+                                <div class="text-muted small">Descrição: Sem descrição</div>
+                                {% endif %}
+
+                                <!-- {% if tatic.chat_id %}
                                 <a href="chat/{{ tatic.chat_id }}">
                                     <div class=" small btn btn-primary"> > Chat </div>
                                 </a>
-                                {% endif %}
+                                {% endif %} -->
                             </div>
                             <span class="badge bg-primary rounded-pill ms-3 mt-2 mt-sm-0">{{ tatic.time }} min</span>
                         </div>

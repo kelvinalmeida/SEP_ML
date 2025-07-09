@@ -19,11 +19,11 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
         </svg>
 
-        <h2 class="text-success">Domínio Criado com Sucesso!</h2>
+        <h2 class="text-success">Sessão Criado com Sucesso!</h2>
 
         <div class="btn-group d-flex justify-content-center mt-4">
-            <a href="{{ url_for('domain.list_domains') }}" class="btn btn-primary">Ver todas os Domínios</a>
-            <a href="{{ url_for('session.create_session') }}" class="btn btn-secondary">Criar Sessão</a>
+            <a href="{{ url_for('session.list_sessions') }}" class="btn btn-primary">Ver todas as Sessões</a>
+            <a href="{{ url_for('session.create_session') }}" class="btn btn-secondary">Criar outra Sessão</a>
             <a href="{{ url_for('login.home_page') }}" class="btn btn-info">Página Inicial</a>
         </div>
     </div>

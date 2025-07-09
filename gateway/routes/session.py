@@ -28,7 +28,7 @@ def create_session(current_user=None):
             response = requests.post(f"{CONTROL_URL}/sessions/create", json=data)
 
             if response.status_code == 200:
-                return redirect(url_for('login.home_page'))  # ou qualquer outra página
+                return render_template("/control/success.html")
             else:
                 return f"Erro ao criar sessão: {response.status_code}", response.status_code
         except RequestException as e:
