@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for
+from app import login_bp
 from requests.exceptions import RequestException
 import requests
 from .auth import token_required
@@ -14,16 +15,26 @@ def create_students():
         age = request.form["age"]
         course = request.form["course"]
         type = "student"
+        email = request.form["email"]
         username = request.form["username"]
         password = request.form["password"]
 
-        student = {"name": name, "age": age, "course": course, "type": type, "username": username, "password": password}
+        student = {"name": name, "age": age, "course": course, "type": type, 'email': email, "username": username, "password": password}
         
         try:
+            all_students_usernames = requests.get(f"{USER_URL}/students/all_students_usernames").json()
+            all_teachers_usernames = requests.get(f"{USER_URL}/teachers/all_teachers_usernames").json()
+            
+            # return f"{all_students_usernames} {all_teachers_usernames}"
+            if username in all_students_usernames["usernames"] or username in all_teachers_usernames["usernames"]:
+                return render_template("./user/create_student.html", error="Username already exists")
+
             response = requests.post(f"{USER_URL}/students/create", json=student)
             if response.status_code == 200:
-                json_response = response.json()
-                return jsonify(json_response), 200
+                # json_response = response.json()
+                # return jsonify(json_response), 200
+                return render_template("./user/success.html")
+
             else:
                 return jsonify({"error": "Failed to create student", "details": response.text}), response.status_code
         except RequestException as e:

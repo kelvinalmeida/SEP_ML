@@ -33,9 +33,10 @@ def create_domain(current_user=None):
         response = requests.post(f"{DOMAIN_URL}/domains/create", data=data, files=files_payload)
 
         if response.ok:
-            flash("Domain created successfully!")
+            return render_template('/domain/success.html')
         else:
-            flash("Failed to create domain.")
+            flash(f"Falha ao criar domínio. {response.status_code} - {response.text}")
+
 
         return redirect(url_for('domain.create_domain'))
 
@@ -71,7 +72,7 @@ def get_domain(current_user=None, domain_id=None):
         domain = None
 
     
-    return f"{domain}"
+    # return f"{domain}"
 
     return render_template("/domain/domain_detail.html", domain=domain)
     # return jsonify(domain), 200  # Retorna os detalhes do domínio em formato JSON

@@ -5,7 +5,7 @@ class Domain(db.Model):
     name = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
     
-    pdfs = db.relationship('PDF', backref='domain', lazy=True)
+    pdfs = db.relationship('PDF', backref='domain', lazy='joined')
 
     def to_dict(self):
         return {

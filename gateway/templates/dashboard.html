@@ -56,20 +56,55 @@
 
             <!-- Navegação -->
             <div class="mt-4 nav-buttons d-flex flex-wrap justify-content-center gap-3">
-                <a href="/students" class="btn btn-light">Ver Estudantes</a>
-                <a href="/teachers" class="btn btn-light">Ver Professores</a>
-                <a href="/sessions" class="btn btn-light">Ver Sessões</a>
 
+                <!-- Grupo: Usuários -->
+                <div class="dropdown">
+                    <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Usuários
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/students">Ver Estudantes</a></li>
+                        <li><a class="dropdown-item" href="/teachers">Ver Professores</a></li>
+                    </ul>
+                </div>
+
+                <!-- Grupo: Sessão -->
+                <div class="dropdown">
+                    <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Sessões
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/sessions">Ver Sessões</a></li>
+                        {% if current_user and current_user.type == 'teacher' %}
+                        <li><a class="dropdown-item" href="/sessions/create">Criar Sessão</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
 
                 {% if current_user and current_user.type == 'teacher' %}
-                <a href="/sessions/create" class="btn btn-light">Criar Sessão</a>
-                <a href="/strategies" class="btn btn-light">Ver Strategias</a>
-                <a href="/strategies/create" class="btn btn-light">Criar Strategia</a>
-                <a href="/domains" class="btn btn-light">Ver Domínios</a>
-                <a href="/domains/create" class="btn btn-light">Criar Domínio</a>
+
+                <!-- Grupo: Estratégias -->
+                <div class="dropdown">
+                    <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Estratégias
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/strategies">Ver Estratégias</a></li>
+                        <li><a class="dropdown-item" href="/strategies/create">Criar Estratégia</a></li>
+                    </ul>
+                </div>
+
+                <!-- Grupo: Domínios -->
+                <div class="dropdown">
+                    <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Domínios
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/domains">Ver Domínios</a></li>
+                        <li><a class="dropdown-item" href="/domains/create">Criar Domínio </a></li>
+
+                </div>
                 {% endif %}
-            </div>
-        </div>
     </header>
 
     <!-- Mensagem de boas-vindas -->

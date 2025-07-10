@@ -11,10 +11,11 @@ def create_student():
         age = request.json["age"]
         course = request.json["course"]
         type = "student"
+        email = request.json["email"]
         username = request.json["username"]
         password = request.json["password"]
 
-        student = Student(name=name, age=age, course=course, type=type, username=username, password_hash=password)
+        student = Student(name=name, age=age, course=course, type=type, email=email, username=username, password_hash=password)
         db.session.add(student)
         db.session.commit()
         return jsonify({"message": "Aluno criado com sucesso!"}), 200
@@ -58,21 +59,36 @@ def delete_student(student_id):
 def ids_to_names():
     ids = request.args.getlist('ids')
     
-    if not ids:
-        return jsonify({"error": "No IDs provided"}), 400
+    # if not ids:
+    #     result = { "usernames": [],
+    #            "ids_with_usernames": [{"username": '', "id": '', 'type': 'estudante'}] }
+    #     return jsonify(result), 200
 
     try:
         # converte todos os ids para inteiros
         ids = list(map(int, ids))
+        students = Student.query.filter(Student.id.in_(ids)).all()
+
+        result = { "usernames": [student.username for student in students],
+                "ids_with_usernames": [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students] }
+
+        return jsonify(result), 200
+    
     except ValueError:
-        return jsonify({"error": "IDs must be integers"}), 400
+        result = { "usernames": [],
+               "ids_with_usernames": [{"username": '', "id": '', 'type': 'estudante'}] }
+        return jsonify(result), 200
 
-    students = Student.query.filter(Student.id.in_(ids)).all()
 
-    if not students:
-        return jsonify({"error": "No students found"}), 404
 
-    result = { "usernames": [student.username for student in students],
-               "ids_with_usernames": [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students] }
+@student_bp.route('/students/all_students_usernames', methods=['GET'])
+def all_students_usernames():
+    students = Student.query.all()
+    
+    # if not students:
+    #     return jsonify({"error": "No students found"}), 404
 
-    return jsonify(result), 200
+    usernames = [student.username for student in students]
+    # ids_with_usernames = [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students]
+
+    return jsonify({"usernames": usernames}), 200
