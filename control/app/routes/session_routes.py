@@ -48,7 +48,7 @@ def get_session_by_id(session_id):
     return jsonify({"error": "Session not found"}), 404
     
 
-@session_bp.route('/sessions/delete/<int:session_id>', methods=['DELETE'])
+@session_bp.route('/sessions/delete/<int:session_id>', methods=['DELETE']) 
 def delete_session(session_id):
     session = Session.query.get(session_id)
     if session:
