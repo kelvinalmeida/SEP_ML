@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify, session, redirect
 from requests.exceptions import RequestException
 import requests
 from .services_routs import STRATEGIES_URL, CONTROL_URL, USER_URL
@@ -63,7 +63,22 @@ def get_strategies(current_user=None):
     try:
         response = requests.get(f"{STRATEGIES_URL}/strategies")
         strategies = response.json()  # pega o JSON
+
+        # return jsonify(strategies), 200
         return render_template('./strategies/list_strategies.html', strategies=strategies)
+    except RequestException as e:
+        return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503
+    
+    
+@strategy_bp.route('/strategies/remove/<int:strategy_id>', methods=['POST'])
+def remove_strategy(strategy_id):
+    try:
+        response = requests.delete(f"{STRATEGIES_URL}/strategies/remove/{strategy_id}")
+        if response.status_code == 200:
+            # return jsonify({"success": "Strategy removed!"}), 200
+            return redirect('/strategies')
+        else:
+            return jsonify({"error": "Failed to remove strategy", "details": response.text}), response.status_code
     except RequestException as e:
         return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503
     

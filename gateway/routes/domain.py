@@ -58,6 +58,16 @@ def list_domains(current_user=None):
     return render_template("/domain/list_domains.html", domains=domains)
     # return jsonify(domains), 200  # Retorna a lista de domínios em formato JSON
 
+@domain_bp.route("/domains/delete/<int:domain_id>", methods=["POST"])
+def delete_domain(current_user=None, domain_id=None):
+    try:
+        # Faz uma requisição DELETE para o microserviço de domínio
+        response = requests.delete(f"{DOMAIN_URL}/domains/delete/{domain_id}")
+        response.raise_for_status()  # Levanta um erro se a resposta não for 200 OK
+        return redirect('/domains')  # Redireciona para a lista de domínios após a exclusão
+    except RequestException as e:
+        flash("Failed to delete domain.")
+        return jsonify({"error": "Failed to delete domain"}), 500
 
 @domain_bp.route("/domains/<int:domain_id>", methods=["GET"])
 @token_required
