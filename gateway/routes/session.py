@@ -131,7 +131,7 @@ def get_session_by_id(session_id, current_user=None):
 
         domains_params = { 'ids': session.get("domains", [])}
         domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()
-        session["domains"] = domains 
+        session["domains"] = domains
 
         # return f"{session}"
         return render_template("control/show_session.html", session=session, current_user=current_user)

@@ -55,6 +55,21 @@ def list_domains():
     domains_json = [domain.to_dict() for domain in domains]
     return domains_json, 200
 
+@domain_bp.route('/domains/delete/<int:domain_id>', methods=['DELETE'])
+def delete_domain(domain_id):
+    domain = Domain.query.get_or_404(domain_id)
+    
+    # Delete associated PDFs
+    for pdf in domain.pdfs:
+        if os.path.exists(pdf.path):
+            os.remove(pdf.path)
+        db.session.delete(pdf)
+
+    db.session.delete(domain)
+    db.session.commit()
+    
+    return jsonify({"message": "Domain deleted successfully!"}), 200
+
 
 @domain_bp.route('/domains/<int:domain_id>', methods=['GET'])
 def get_domain(domain_id):
@@ -79,7 +94,7 @@ def ids_to_names():
     ids = request.args.getlist('ids')
     
     if not ids:
-        return jsonify({"error": "No IDs provided"}), 400
+        return jsonify([]), 200
 
     try:
         # converte todos os ids para inteiros

@@ -70,7 +70,11 @@
                         <div id="tacticTimer" class="badge bg-dark my-3">--</div>
                         <div id="tatic_here"></div>
 
+                        {% if session.domains %}
                         <div id="pdf_data" data-pdfs='{{ session.domains[0].pdfs | tojson | safe }}'></div>
+                        {% else %}
+                        <p class="text-muted ">Nenhum domínio associado a essa sessão.</p>
+                        {% endif %}
                     </div>
                 </div>
 
