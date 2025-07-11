@@ -157,7 +157,7 @@
             const inputTime = document.createElement('input');
             inputTime.type = 'number';
             inputTime.name = 'times';
-            inputTime.className = 'form-control';
+            inputTime.className = 'form-control w-10';
             inputTime.placeholder = 'Tempo (min)';
             inputTime.required = true;
             inputTime.min = '0';
@@ -165,16 +165,16 @@
             inputTime.step = '0.01';
 
             const inputDescription = document.createElement('input');
+            inputDescription.type = 'text';
+            inputDescription.name = 'description';
+            inputDescription.className = 'form-control w-50';
             if (tacticName == "Apresentacao Sincrona") {
-                inputDescription.type = 'text';
-                inputDescription.name = 'description';
-                inputDescription.className = 'form-control';
                 inputDescription.placeholder = 'Adicione o link do google Meet ou Zoom';
                 inputDescription.required = true;
             } else {
-                inputDescription.type = 'hidden';
-                inputDescription.name = 'description';
-                inputDescription.value = 'hidden';
+                // inputDescription.type = 'hidden';
+                inputDescription.placeholder = 'Adicone uma descrição (opcional)';
+                // inputDescription.value = 'hidden';
             }
 
             const deleteBtn = document.createElement('button');

@@ -72,7 +72,7 @@ def get_full_tatics_time():
         for tactic in strategy.tatics:  # Acesso via atributo, não via dicionário
             full_tactics_time += getattr(tactic, "time", 0)  # ou tactic.time se tiver certeza que tem esse atributo
 
-    return jsonify({"full_tactics_time": full_tactics_time}), 200
+    return jsonify({"full_tactics_time": round(full_tactics_time, 2)}), 200
 
 @strategies_bp.route('/strategies/remove/<int:strategy_id>', methods=['DELETE'])
 def remove_strategy(strategy_id):

@@ -6,12 +6,25 @@ document.addEventListener("DOMContentLoaded", () => {
     let apresentacaoSicrona_isActive = false;
     let reuso_isActive = false;
     let envio_informacao_isActive = false;
-
+    let current_tatic_description = 'Nenhuma tática ativa no momento.';
 
     const session_id = window.session_id;
     const token = window.token;
 
+
     console.log("Session ID: ", session_id);
+
+    taticDescription("Sessão finalizada ou sem tática ativa no momento.");
+    function taticDescription(description) {
+
+        if (description === 'hidden' || description === undefined || description.trim() === "") {
+            description = "Nenhuma descrição disponível";
+        }
+
+        const descriptionElement = document.getElementById("current_tatic_description");
+
+        descriptionElement.innerText = description;
+    }
 
 
     function qual_tatica_esta_ativa(debate_sicrono, apresentacao_sincrona, reuso, envio_informacao) {
@@ -64,6 +77,15 @@ document.addEventListener("DOMContentLoaded", () => {
         clearInterval(countdownInterval);
         let timeLeft = remainingTime;
 
+        // Resetar estado de ativação a cada nova tática
+        taticaAtiva = false;
+
+        // Opcional: resetar todos os flags
+        debateSicrono_isActive = false;
+        apresentacaoSicrona_isActive = false;
+        reuso_isActive = false;
+        envio_informacao_isActive = false;
+
         countdownInterval = setInterval(() => {
             if (timeLeft <= 0) {
                 clearInterval(countdownInterval);
@@ -75,22 +97,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 let formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                 document.getElementById("tacticTimer").innerText = formattedTime;
 
-
                 timeLeft--;
 
-
-                const elementToRemove = document.getElementById('chat');
-                if (elementToRemove) {
-                    elementToRemove.remove(); // Remove o próprio elemento
-                }
+                // const elementToRemove = document.getElementById('chat');
+                // if (elementToRemove) {
+                //     elementToRemove.remove(); // Remove o próprio elemento
+                // }
 
                 // Verifica se a tática atual é "Debate Sincrono"
                 if (tacticName == "Debate Sincrono") {
 
                     // Evitar adicionar o botão várias vezes:
-                    if (!document.getElementById("chat")) {
+                    if (!document.getElementById("debate_sicrono")) {
 
-                        qual_tatica_esta_ativa(true, false, false);
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
+                        qual_tatica_esta_ativa(true, false, false, false);
 
                         removerElemento();
 
@@ -113,6 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 else if (tacticName == "Apresentacao Sincrona") {
                     if (!document.getElementById("apresentacao_sincrona")) {
 
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
                         qual_tatica_esta_ativa(false, true, false, false);
                         removerElemento();
 
@@ -149,7 +171,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     if (!document.getElementById("pdf_container")) {
 
-                        qual_tatica_esta_ativa(false, false, true);
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
+                        qual_tatica_esta_ativa(false, false, true, false);
                         removerElemento();
 
                         let pdfContainer = document.createElement("div");
@@ -192,14 +215,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 else if (tacticName == "Envio de Informacao") {
-                    if (!document.getElementById("chat")) {
+                    if (!document.getElementById("envio_informacao_aviso")) {
 
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
                         qual_tatica_esta_ativa(false, false, false, true);
                         removerElemento();
 
                         // Criar container visual com mensagem e botão
                         const avisoDiv = document.createElement("div");
-                        avisoDiv.id = "chat";
+                        avisoDiv.id = "envio_informacao_aviso";
                         avisoDiv.className = "alert alert-info shadow-lg p-4 rounded border border-primary";
 
                         avisoDiv.innerHTML = `
@@ -252,6 +276,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (chatElement && !debateSicrono_isActive) {
             chatElement.remove();
         }
+
+        let envio_informacao_aviso = document.getElementById("envio_informacao_aviso");
+        if (envio_informacao_aviso && !envio_informacao_isActive) {
+            envio_informacao_aviso.remove();
+        }
     }
 
     function realod_page() {
@@ -270,12 +299,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.log("Dados da tática atual: ", data);
                 if (data.tactic && data.session_status === 'in-progress') {
                     document.getElementById("tacticName").innerText = data.tactic.name;
+                    taticDescription(data.tactic.description || "Nenhuma descrição disponível");
                     startCountdown(data.remaining_time, data.strategy_tactics, data.tactic.name);
                 } else {
                     document.getElementById("tacticName").innerText = "Sessão finalizada";
                     document.getElementById("tacticTimer").innerText = "--";
                     qual_tatica_esta_ativa(false, false, false, false);
                     removerElemento();
+                    taticDescription("Sessão finalizada ou sem tática ativa no momento.");
                     clearInterval(countdownInterval);
                 }
             })
