@@ -13,6 +13,7 @@ domain_bp = Blueprint("domain", __name__)
 def create_domain(current_user=None):
     if request.method == "POST":
         # Captura dados do formulário do usuário
+        return f"{request.form} - {request.files}"
         name = request.form.get("name")
         description = request.form.get("description")
         files = request.files.getlist("pdfs")
