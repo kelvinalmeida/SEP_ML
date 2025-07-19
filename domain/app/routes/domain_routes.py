@@ -1,7 +1,8 @@
+import json
 from flask import request, redirect, url_for, render_template, send_file, Blueprint, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
-from ..models import Domain, PDF
+from ..models import Domain, PDF, Exercise, VideoUpload, VideoYoutube
 from .. import db
 import os
 
@@ -14,27 +15,24 @@ def create_tables():
 
 
 # ou configure isso no app config
-
 @domain_bp.route('/domains/create', methods=['POST'])
 def create_domain():
     UPLOAD_FOLDER = os.path.join(current_app.root_path, 'uploads')
 
     name = request.form.get('name')
     description = request.form.get('description')
-    files = request.files.getlist("pdfs")
+    exercises_raw = request.form.get('exercises')
+    youtube_link = request.form.get('youtube_link')  # novo campo
 
+    pdf_files = request.files.getlist("pdfs")
+    video_file = request.files.get("video")  # apenas um vídeo por upload
 
     new_domain = Domain(name=name, description=description)
     db.session.add(new_domain)
     db.session.commit()
 
-    print("FILES RECEBIDOS:")
-    print(files)
-    for f in files:
-        print(f.filename)
-
-
-    for file in files:
+    # PDFs
+    for file in pdf_files:
         if file and file.filename.endswith('.pdf'):
             filename = secure_filename(file.filename)
             path = os.path.join(UPLOAD_FOLDER, filename)
@@ -42,6 +40,40 @@ def create_domain():
 
             pdf = PDF(filename=filename, path=path, domain_id=new_domain.id)
             db.session.add(pdf)
+
+    # Vídeo de upload (mp4)
+    if video_file and video_file.filename.endswith('.mp4'):
+        filename = secure_filename(video_file.filename)
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        video_file.save(path)
+
+        video = VideoUpload(filename=filename, path=path, domain_id=new_domain.id)
+        db.session.add(video)
+
+    # Vídeo do YouTube
+    if youtube_link:
+        yt = VideoYoutube(url=youtube_link.strip(), domain_id=new_domain.id)
+        db.session.add(yt)
+
+    # Exercícios
+    if exercises_raw:
+        try:
+            exercises = json.loads(exercises_raw)
+            for ex in exercises:
+                question = ex.get("question", "").strip()
+                options = ex.get("options", [])
+                correct = ex.get("correct", "").strip()
+
+                if question and options and correct:
+                    exercise = Exercise(
+                        question=question,
+                        options=json.dumps(options),  # salva como JSON string
+                        correct=correct,
+                        domain_id=new_domain.id
+                    )
+                    db.session.add(exercise)
+        except Exception as e:
+            return jsonify({"message": "Erro ao processar exercícios", "error": str(e)}), 400
 
     db.session.commit()
     return jsonify({"message": "Domain created successfully!"}), 200

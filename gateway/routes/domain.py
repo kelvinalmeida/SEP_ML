@@ -2,46 +2,85 @@ from flask import Blueprint, render_template, request, redirect, url_for, make_r
 from requests.exceptions import RequestException
 from .auth import token_required
 import requests
+import json
 
 from .auth import verificar_cookie
 from .services_routs import DOMAIN_URL
 
 domain_bp = Blueprint("domain", __name__)
 
-@domain_bp.route("/domains/create", methods=["GET", "POST"])
+@domain_bp.route("/domains/create", methods=["GET", "POST"]) 
 @token_required
 def create_domain(current_user=None):
     if request.method == "POST":
-        # Captura dados do formulário do usuário
-        return f"{request.form} - {request.files}"
+        # return f"{request.form, request.files}"
         name = request.form.get("name")
         description = request.form.get("description")
+        youtube_link = request.form.get("youtube_link")
         files = request.files.getlist("pdfs")
+        video = request.files.get("video_file")
 
-        # Monta os dados do formulário para enviar ao microserviço
+        # Captura exercícios do formulário
+        exercises = []
+        index = 0
+        while True:
+            question_key = f"exercises[{index}][question]"
+            correct_key = f"exercises[{index}][correct]"
+
+            if question_key not in request.form:
+                break  # Não há mais questões
+
+            question = request.form.get(question_key)
+            correct = request.form.get(correct_key)
+
+            # Captura as opções
+            options = []
+            option_index = 0
+            while True:
+                option_key = f"exercises[{index}][options][{option_index}]"
+                if option_key not in request.form:
+                    break
+                options.append(request.form.get(option_key))
+                option_index += 1
+
+            exercises.append({
+                "question": question,
+                "options": options,
+                "correct": correct
+            })
+
+            index += 1
+
+        # Monta o dicionário de dados
         data = {
             'name': name,
-            'description': description
+            'description': description,
+            'youtube_link': youtube_link,
+            'exercises': json.dumps(exercises)  # serializa para string
         }
 
-        # Monta os arquivos
         files_payload = [
             ('pdfs', (file.filename, file.stream, file.content_type))
             for file in files
         ]
 
-        # Envia via POST para o microserviço
+        if video:
+            files_payload.append(('video', (video.filename, video.stream, video.content_type)))
+
+        # return f"{data} - {files_payload}"
+
+        # Envia para o microserviço
         response = requests.post(f"{DOMAIN_URL}/domains/create", data=data, files=files_payload)
 
         if response.ok:
             return render_template('/domain/success.html')
         else:
             flash(f"Falha ao criar domínio. {response.status_code} - {response.text}")
+            return redirect(url_for('domain.create_domain'))
+
+    return render_template('/domain/create_domain.html')
 
 
-        return redirect(url_for('domain.create_domain'))
-
-    return render_template('/domain/create_domain.html')  # Página com formulário
 
 
 @domain_bp.route("/domains", methods=["GET"])
@@ -55,6 +94,9 @@ def list_domains(current_user=None):
     except RequestException as e:
         flash("Failed to fetch domains.")
         domains = []
+
+    
+    return f"{domains}"
 
     return render_template("/domain/list_domains.html", domains=domains)
     # return jsonify(domains), 200  # Retorna a lista de domínios em formato JSON
