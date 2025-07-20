@@ -179,8 +179,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         pdfContainer.id = "pdf_container";
 
                         let pdfData = document.getElementById("pdf_data").getAttribute("data-pdfs");
+                        console.log("pdfData: ", pdfData);
                         let pdfs = JSON.parse(pdfData);
-
+                        // console.log("PDFs recebidos: ", pdfs);
                         pdfs.forEach(pdf => {
                             fetch(`/pdfs/${pdf.id}`, {
                                 headers: {

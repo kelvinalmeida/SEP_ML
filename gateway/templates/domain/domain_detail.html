@@ -1,39 +1,88 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 
 <head>
     <meta charset="UTF-8">
-    <title>Domain Detail</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Detalhes do Domínio</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .list-title {
+            margin-top: 1rem;
+            font-weight: 600;
+            color: #0d6efd;
+        }
+
+        ol {
+            padding-left: 20px;
+        }
+    </style>
 </head>
 
 <body class="bg-light">
     <div class="container py-5">
-        <h1 class="mb-4">{{ domain.name }}</h1>
+        <a href="{{ url_for('domain.list_domains') }}" class="btn btn-outline-primary mb-4">← Voltar</a>
 
-        <div class="card mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ domain.name }}</h4>
+            </div>
             <div class="card-body">
-                <h5 class="card-title">Description</h5>
-                <p class="card-text">{{ domain.description }}</p>
+                <p><strong>Descrição:</strong> {{ domain.description or "Sem descrição." }}</p>
+
+                <!-- PDFs -->
+                {% if domain.pdfs %}
+                <p class="list-title">Arquivos PDF:</p>
+                <ul>
+                    {% for pdf in domain.pdfs %}
+                    <li>
+                        {{ pdf.filename }}
+                        <a href="{{ url_for('domain.proxy_pdf_download', pdf_id=pdf.id) }}"
+                            class="btn btn-sm btn-link">📥 Download</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                <!-- Vídeos do YouTube -->
+                {% if domain.videos_youtube %}
+                <p class="list-title">Vídeos do YouTube:</p>
+                <ul>
+                    {% for yt in domain.videos_youtube %}
+                    <li><a href="{{ yt.url }}" target="_blank">{{ yt.url }}</a></li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                <!-- Vídeos enviados -->
+                {% if domain.videos_uploaded %}
+                <p class="list-title">Vídeos Enviados:</p>
+                <ul>
+                    {% for vid in domain.videos_uploaded %}
+                    <li>{{ vid.filename }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                <!-- Exercícios -->
+                {% if domain.exercises %}
+                <p class="list-title">Exercícios:</p>
+                <ol>
+                    {% for ex in domain.exercises %}
+                    <li>
+                        <p><strong>Pergunta:</strong> {{ ex.question }}</p>
+                        <p><strong>Opções:</strong></p>
+                        <ul>
+                            {% for opt in ex.options %}
+                            <li>{{ opt }}</li>
+                            {% endfor %}
+                        </ul>
+                        <p><strong>Correta:</strong> {{ ex.correct }}</p>
+                    </li>
+                    {% endfor %}
+                </ol>
+                {% endif %}
             </div>
         </div>
-
-        <h4>PDF Files</h4>
-        {% if domain.pdfs %}
-        <ul class="list-group">
-            {% for pdf in domain.pdfs %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                {{ pdf.filename }}
-                <a href="{{ url_for('domain.proxy_pdf_download', pdf_id=pdf.id) }}"
-                    class="btn btn-sm btn-primary">Download</a>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p>No PDF files available for this domain.</p>
-        {% endif %}
-
-        <a href="{{ url_for('domain.list_domains') }}" class="btn btn-secondary mt-4">Back to Domain List</a>
     </div>
 </body>
 

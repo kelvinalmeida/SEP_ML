@@ -96,7 +96,7 @@ def list_domains(current_user=None):
         domains = []
 
     
-    return f"{domains}"
+    # return f"{domains}"
 
     return render_template("/domain/list_domains.html", domains=domains)
     # return jsonify(domains), 200  # Retorna a lista de domínios em formato JSON
@@ -119,6 +119,7 @@ def get_domain(current_user=None, domain_id=None):
         # Faz uma requisição GET para o microserviço de domínio
         response = requests.get(f"{DOMAIN_URL}/domains/{domain_id}")
         response.raise_for_status()  # Levanta um erro se a resposta não for 200 OK
+        # return f"{response.json()}"
         domain = response.json()
     except RequestException as e:
         flash("Failed to fetch domain.")

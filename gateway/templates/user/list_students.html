@@ -30,10 +30,13 @@
                         <p class="card-text">
                             <strong>Curso:</strong> {{ student.course }}<br>
                             <strong>Idade:</strong> {{ student.age }}<br>
-                            <strong>ID:</strong> {{ student.id }}<br>
                             <strong>Tipo:</strong> {{ student.type }}<br>
+
+                            {% if current_user and current_user.type == 'teacher' %}
+                            <strong>ID:</strong> {{ student.id }}<br>
                             <strong>username:</strong> {{ student.username }}<br>
                             <strong>password:</strong> {{ student.password }}<br>
+                            {% endif %}
                         </p>
                     </div>
                 </div>

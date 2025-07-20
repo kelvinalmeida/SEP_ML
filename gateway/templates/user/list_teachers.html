@@ -31,8 +31,11 @@
                             <strong>Idade:</strong> {{ teacher.age }}<br>
                             <strong>ID:</strong> {{ teacher.id }}<br>
                             <strong>Tipo:</strong> {{ teacher.type }}<br>
+
+                            {% if current_user and current_user.type == 'teacher' %}
                             <strong>username:</strong> {{ teacher.username }}<br>
                             <strong>password:</strong> {{ teacher.password }}<br>
+                            {% endif %}
                         </p>
                     </div>
                 </div>

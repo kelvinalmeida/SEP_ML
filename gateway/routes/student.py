@@ -49,7 +49,8 @@ def get_students(current_user=None):
     try:
         response = requests.get(f"{USER_URL}/students")
         students = response.json()  # pega o JSON
-        return render_template("./user/list_students.html", students=students)
+        # return f"{students}"
+        return render_template("./user/list_students.html", students=students, current_user=current_user)
     except RequestException as e:
         return jsonify({"error": "User service unavailable", "details": str(e)}), 503
 

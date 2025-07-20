@@ -19,7 +19,9 @@
             border-top-right-radius: 0.5rem;
         }
 
-        .pdf-list li {
+        .pdf-list li,
+        .video-list li,
+        .exercise-list li {
             font-size: 0.9rem;
         }
 
@@ -61,17 +63,58 @@
                     <div class="card-body d-flex flex-column">
                         <p class="card-text mb-3">{{ domain.description or "Sem descrição." }}</p>
 
-                        {% if domain.pdfs and domain.pdfs|length > 0 %}
+                        <!-- PDFs -->
+                        {% if domain.pdfs %}
                         <h6 class="text-secondary">Arquivos PDF:</h6>
                         <ul class="list-group list-group-flush pdf-list mb-3">
                             {% for pdf in domain.pdfs %}
                             <li class="list-group-item">{{ pdf.filename }}</li>
                             {% endfor %}
                         </ul>
-                        {% else %}
-                        <p class="text-muted">Nenhum PDF associado.</p>
                         {% endif %}
 
+                        <!-- Vídeos do YouTube -->
+                        {% if domain.videos_youtube %}
+                        <h6 class="text-secondary">Vídeos do YouTube:</h6>
+                        <ul class="list-group list-group-flush video-list mb-3">
+                            {% for yt in domain.videos_youtube %}
+                            <li class="list-group-item">
+                                <a href="{{ yt.url }}" target="_blank">{{ yt.url }}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+
+                        <!-- Vídeos enviados -->
+                        {% if domain.videos_uploaded %}
+                        <h6 class="text-secondary">Vídeos Enviados:</h6>
+                        <ul class="list-group list-group-flush video-list mb-3">
+                            {% for vid in domain.videos_uploaded %}
+                            <li class="list-group-item">{{ vid.filename }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+
+                        <!-- Exercícios -->
+                        {% if domain.exercises %}
+                        <h6 class="text-secondary">Exercícios:</h6>
+                        <ul class="list-group list-group-flush exercise-list mb-3">
+                            {% for ex in domain.exercises %}
+                            <li class="list-group-item">
+                                <strong>Pergunta:</strong> {{ ex.question }}<br>
+                                <!-- <strong>Opções:</strong>
+                                <ol>
+                                    {% for opt in ex.options %}
+                                    <li>{{ opt }}</li>
+                                    {% endfor %}
+                                </ol> -->
+                                <!-- <strong>Correta:</strong> {{ ex.correct }} -->
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+
+                        <!-- Ações -->
                         <div class="mt-auto d-flex gap-2">
                             <a href="/domains/{{ domain.id }}" class="btn btn-sm btn-secondary w-100">Ver Detalhes</a>
                             <form action="/domains/delete/{{ domain.id }}" method="POST" class="w-100"
