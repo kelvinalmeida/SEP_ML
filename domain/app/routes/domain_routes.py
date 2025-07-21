@@ -5,6 +5,7 @@ import os
 from ..models import Domain, PDF, Exercise, VideoUpload, VideoYoutube
 from .. import db
 import os
+from flask import send_from_directory
 
 
 domain_bp = Blueprint('domain_bp', __name__)
@@ -144,3 +145,35 @@ def ids_to_names():
         for domain in domains ]
 
     return jsonify(result), 200
+
+
+@domain_bp.route('/domains/<int:domain_id>/exercises', methods=['GET'])
+def get_domain_exercises(domain_id):
+    domain = Domain.query.get_or_404(domain_id)
+    return jsonify([exercise.to_dict() for exercise in domain.exercises]), 200
+
+
+
+@domain_bp.route('/domains/<int:domain_id>/videos', methods=['GET'])
+def get_domain_videos(domain_id):
+    domain = Domain.query.get_or_404(domain_id)
+    return jsonify({
+        "videos_uploaded": [video.to_dict() for video in domain.videos_uploaded],
+        "videos_youtube": [video.to_dict() for video in domain.videos_youtube],
+    }), 200
+
+
+@domain_bp.route('/video/uploaded/<int:video_id>', methods=['GET'])
+def get_uploaded_video(video_id):
+
+    UPLOAD_FOLDER = os.path.join(current_app.root_path, 'uploads')
+
+    video = VideoUpload.query.get_or_404(video_id)
+    
+    filename = video.filename  # supondo que sua classe VideoUpload tenha um campo `filename`
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found on server'}), 404
+    
+    return send_from_directory(UPLOAD_FOLDER, filename)

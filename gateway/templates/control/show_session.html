@@ -68,7 +68,6 @@
                     <div>
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
                         <div id="tacticTimer" class="badge bg-dark my-3">--</div>
-                        <!-- <div id="current_tatic_description" class="alert alert-light my-3" role="alert"></div> -->
                         <div id="current_tatic_description" class="alert alert-info" role="alert">
 
                         </div>
@@ -152,12 +151,21 @@
     <script>
         window.session_id = "{{ session.id }}";
         window.token = "{{ token }}";
+        let session_json = {{ session | tojson }};
+        window.videos_uploaded_id = session_json.domains[0].videos_uploaded[0].id;
+        window.domain_id = session_json.domains[0].id;
+        // console.log()
+        // console.log(typeof session_json); // Agora será 'object'
         // window.myUserId = "{{ current_user['id'] }}";
         // window.chatId = "{{ chat_id }}";
         // console.log("Chat ID:", window.chatId);
     </script>
 
     <script src="{{ url_for('static', filename='js/show_session.js') }}"></script>
+
+    <!-- Bootstrap Bundle (inclui Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 
 </body>
 

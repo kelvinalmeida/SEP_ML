@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const session_id = window.session_id;
     const token = window.token;
+    const videos_uploaded_id = window.videos_uploaded_id;
+    const domain_id = window.domain_id;
 
 
     console.log("Session ID: ", session_id);
@@ -168,20 +170,61 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 else if (tacticName == "Reuso") {
+                    if (!document.getElementById("reuso_tabs")) {
 
-                    if (!document.getElementById("pdf_container")) {
-
-                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
                         qual_tatica_esta_ativa(false, false, true, false);
                         removerElemento();
 
-                        let pdfContainer = document.createElement("div");
-                        pdfContainer.id = "pdf_container";
+                        const tatic_here = document.getElementById("tatic_here");
 
-                        let pdfData = document.getElementById("pdf_data").getAttribute("data-pdfs");
-                        console.log("pdfData: ", pdfData);
-                        let pdfs = JSON.parse(pdfData);
-                        // console.log("PDFs recebidos: ", pdfs);
+                        // Criar container das abas
+                        const tabContainer = document.createElement("div");
+                        tabContainer.id = "reuso_tabs";
+
+                        tabContainer.innerHTML = `
+            <ul class="nav nav-tabs" id="reusoTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="pdf-tab" data-bs-toggle="tab" data-bs-target="#pdfs" type="button" role="tab">PDFs</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="ex-tab" data-bs-toggle="tab" data-bs-target="#exercicios" type="button" role="tab">Exercícios</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="vid-tab" data-bs-toggle="tab" data-bs-target="#videos" type="button" role="tab">Vídeos</button>
+                </li>
+            </ul>
+            <div class="tab-content mt-3">
+                <div class="tab-pane fade show active" id="pdfs" role="tabpanel">
+                    <div id="pdf_container"></div>
+                </div>
+                <div class="tab-pane fade" id="exercicios" role="tabpanel">
+                    <div id="exercise_container" class="p-2">Carregando exercícios...</div>
+                </div>
+                <div class="tab-pane fade" id="videos" role="tabpanel">
+                    <div id="video_container" class="p-2">Carregando vídeos...</div>
+                </div>
+            </div>
+        `;
+
+
+                        // Forçar o funcionamento das abas Bootstrap depois de adicionar dinamicamente
+                        const tabTriggerList = tabContainer.querySelectorAll('button[data-bs-toggle="tab"]');
+                        tabTriggerList.forEach(function (tabEl) {
+                            tabEl.addEventListener('click', function (event) {
+                                const tab = new bootstrap.Tab(tabEl);
+                                tab.show();
+                            });
+                        });
+
+
+                        tatic_here.appendChild(tabContainer);
+
+                        // ---------- Carregar PDFs ----------
+                        const pdfData = document.getElementById("pdf_data").getAttribute("data-pdfs");
+                        const pdfs = JSON.parse(pdfData);
+
+                        const pdfContainer = document.getElementById("pdf_container");
+
                         pdfs.forEach(pdf => {
                             fetch(`/pdfs/${pdf.id}`, {
                                 headers: {
@@ -195,8 +238,8 @@ document.addEventListener("DOMContentLoaded", () => {
                                     return response.blob();
                                 })
                                 .then(blob => {
-                                    let url = URL.createObjectURL(blob);
-                                    let embed = document.createElement("embed");
+                                    const url = URL.createObjectURL(blob);
+                                    const embed = document.createElement("embed");
                                     embed.src = url;
                                     embed.type = "application/pdf";
                                     embed.width = "100%";
@@ -210,10 +253,75 @@ document.addEventListener("DOMContentLoaded", () => {
                                 });
                         });
 
-                        let tatic_here = document.getElementById("tatic_here");
-                        tatic_here.appendChild(pdfContainer);
+                        // ---------- Carregar Exercícios ----------
+                        // fetch(`/gateway/domains/${domain_id}/exercises`, {
+                        //     headers: {
+                        //         "Authorization": `Bearer ${token}`
+                        //     }
+                        // })
+                        //     .then(res => res.json())
+                        //     .then(data => {
+                        //         const container = document.getElementById("exercise_container");
+                        //         container.innerHTML = "";
+                        //         if (data.length === 0) {
+                        //             container.innerHTML = "<p class='text-muted'>Nenhum exercício encontrado.</p>";
+                        //             return;
+                        //         }
+                        //         data.forEach(ex => {
+                        //             const div = document.createElement("div");
+                        //             div.className = "mb-3 border rounded p-2 bg-light";
+                        //             div.innerHTML = `<strong>${ex.question}</strong><br>${ex.options.map((opt, i) => `<div>${i + 1}) ${opt}</div>`).join("")}`;
+                        //             container.appendChild(div);
+                        //         });
+                        //     })
+                        //     .catch(err => {
+                        //         console.error("Erro ao carregar exercícios:", err);
+                        //     });
+
+                        // ---------- Carregar Vídeos ----------
+                        fetch(`/domains/${domain_id}/videos`, {
+                            headers: {
+                                "Authorization": `Bearer ${token}`
+                            }
+                        })
+                            .then(res => res.json())
+                            // .then(res => console.log(res))
+                            .then(videos_json => {
+                                const container = document.getElementById("video_container");
+                                container.innerHTML = "";
+
+                                // console.log("videos_json: ", videos_json)
+
+                                videos_json.videos_youtube.forEach(video => {
+                                    const embedUrl = convertToEmbedUrl(video.url);
+                                    const div = document.createElement("div");
+                                    div.className = "mb-3";
+                                    div.innerHTML = `<iframe width="560" height="315" 
+                                        src="${embedUrl}" 
+                                        title="YouTube video player" 
+                                        frameborder="0" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                        allowfullscreen></iframe>`;
+                                    container.appendChild(div);
+                                });
+                                
+                                videos_json.videos_uploaded.forEach(video => {
+                                    const videoTag = document.createElement("video");
+                                    const div = document.createElement("div");
+                                    videoTag.controls = true;
+                                    videoTag.src = `/video/uploaded/${video.id}`;
+                                    videoTag.className = "w-100";
+                                    div.appendChild(videoTag);
+                                    container.appendChild(div);
+                                });
+                            })
+                            .catch(err => {
+                                console.error("Erro ao carregar vídeos:", err);
+                            });
+
                     }
                 }
+
 
                 else if (tacticName == "Envio de Informacao") {
                     if (!document.getElementById("envio_informacao_aviso")) {
@@ -261,6 +369,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         }, 1000);
     }
+
+    function convertToEmbedUrl(url) {
+        try {
+            const parsedUrl = new URL(url);
+            const videoId = parsedUrl.searchParams.get("v");
+            if (videoId) {
+                return `https://www.youtube.com/embed/${videoId}`;
+            }
+            return url; // fallback: se não tiver parâmetro "v"
+        } catch (e) {
+            console.error("URL inválida:", url);
+            return url;
+        }
+    }
+
 
     function removerElemento() {
         let existingPdfContainer = document.getElementById("pdf_container");

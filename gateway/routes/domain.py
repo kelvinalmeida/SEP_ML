@@ -3,6 +3,7 @@ from requests.exceptions import RequestException
 from .auth import token_required
 import requests
 import json
+from flask import stream_with_context
 
 from .auth import verificar_cookie
 from .services_routs import DOMAIN_URL
@@ -154,3 +155,32 @@ def proxy_pdf_download(current_user=None, pdf_id=None):
         )
     except RequestException:
         return "Failed to download file", 500
+    
+
+@domain_bp.route("/domains/<int:domain_id>/exercises", methods=["GET"])
+@token_required
+def get_exercises(domain_id, current_user=None):
+    response = requests.get(f"{DOMAIN_URL}/domains/{domain_id}/exercises")
+    return jsonify(response.json()), response.status_code
+
+
+@domain_bp.route('/domains/<int:domain_id>/videos', methods=["GET"])
+@token_required
+def get_videos(domain_id, current_user=None):
+    response = requests.get(f"{DOMAIN_URL}/domains/{domain_id}/videos")
+    return jsonify(response.json()), response.status_code
+
+
+@domain_bp.route("/video/uploaded/<int:video_id>", methods=["GET"])
+def get_uploaded_video(video_id):
+    headers = {"Authorization": request.headers.get("Authorization")}
+    api_response = requests.get(f"{DOMAIN_URL}/video/uploaded/{video_id}", headers=headers, stream=True)
+
+    if api_response.status_code != 200:
+        return Response("Erro ao buscar vídeo da API", status=api_response.status_code)
+
+    return Response(
+        stream_with_context(api_response.iter_content(chunk_size=8192)),
+        content_type=api_response.headers.get('Content-Type', 'video/mp4')
+    )
+
