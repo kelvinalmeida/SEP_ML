@@ -10,16 +10,15 @@ from .services_routs import DOMAIN_URL
 
 domain_bp = Blueprint("domain", __name__)
 
-@domain_bp.route("/domains/create", methods=["GET", "POST"]) 
+@domain_bp.route("/domains/create", methods=["GET", "POST"])  
 @token_required
 def create_domain(current_user=None):
     if request.method == "POST":
-        # return f"{request.form, request.files}"
         name = request.form.get("name")
         description = request.form.get("description")
-        youtube_link = request.form.get("youtube_link")
+        youtube_links = request.form.getlist("videos_youtube")
         files = request.files.getlist("pdfs")
-        video = request.files.get("video_file")
+        videos = request.files.getlist("videos_uploaded")  # apenas um vídeo
 
         # Captura exercícios do formulário
         exercises = []
@@ -29,12 +28,11 @@ def create_domain(current_user=None):
             correct_key = f"exercises[{index}][correct]"
 
             if question_key not in request.form:
-                break  # Não há mais questões
+                break
 
             question = request.form.get(question_key)
             correct = request.form.get(correct_key)
 
-            # Captura as opções
             options = []
             option_index = 0
             while True:
@@ -52,25 +50,28 @@ def create_domain(current_user=None):
 
             index += 1
 
-        # Monta o dicionário de dados
+        # Dados enviados como form-data
         data = {
             'name': name,
             'description': description,
-            'youtube_link': youtube_link,
-            'exercises': json.dumps(exercises)  # serializa para string
+            'youtube_link': [youtube_link for youtube_link in youtube_links],
+            'exercises': json.dumps(exercises)
         }
 
+        # Arquivos a serem enviados para API
         files_payload = [
             ('pdfs', (file.filename, file.stream, file.content_type))
             for file in files
         ]
 
-        if video:
-            files_payload.append(('video', (video.filename, video.stream, video.content_type)))
+        for vid in videos:
+            if vid.filename:
+                files_payload.append(('video', (vid.filename, vid.stream, vid.content_type)))
+
+
 
         # return f"{data} - {files_payload}"
-
-        # Envia para o microserviço
+        # Requisição para o microserviço
         response = requests.post(f"{DOMAIN_URL}/domains/create", data=data, files=files_payload)
 
         if response.ok:
@@ -82,8 +83,6 @@ def create_domain(current_user=None):
     return render_template('/domain/create_domain.html')
 
 
-
-
 @domain_bp.route("/domains", methods=["GET"])
 @token_required
 def list_domains(current_user=None):
@@ -91,6 +90,7 @@ def list_domains(current_user=None):
         # Faz uma requisição GET para o microserviço de domínio
         response = requests.get(f"{DOMAIN_URL}/domains")
         response.raise_for_status()  # Levanta um erro se a resposta não for 200 OK
+        # return f"{response.json()}"
         domains = response.json()
     except RequestException as e:
         flash("Failed to fetch domains.")

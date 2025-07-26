@@ -32,19 +32,11 @@
                         </div>
                     </div>
 
-                    <!-- Seção: Vídeo -->
+                    <!-- Seção: Vídeos -->
                     <div class="card-section">
-                        <div class="section-title">🎬 Video</div>
-                        <div class="mb-3">
-                            <label class="form-label">Upload a Video</label>
-                            <input type="file" name="video_file" class="form-control" accept="video/*">
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">YouTube Video Link</label>
-                            <input type="url" name="youtube_link" class="form-control"
-                                placeholder="https://www.youtube.com/watch?v=...">
-                        </div>
+                        <div class="section-title">🎬 Videos</div>
+                        <div id="video-container"></div>
+                        <button type="button" class="btn btn-outline-secondary mt-2" onclick="addVideoInput()">+ Add Video</button>
                     </div>
 
                     <!-- Seção: Upload de PDFs -->
@@ -87,6 +79,28 @@
 
     <!-- Scripts -->
     <script>
+        let videoCount = 0;
+
+        function addVideoInput() {
+            const container = document.getElementById('video-container');
+            const index = videoCount++;
+
+            const div = document.createElement('div');
+            div.className = 'mb-3 border rounded p-3 position-relative';
+
+            div.innerHTML = `
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-2" aria-label="Close" onclick="this.parentElement.remove()"></button>
+
+                <label class="form-label">Upload a Video</label>
+                <input type="file" name="videos_uploaded" class="form-control mb-2" accept="video/*">
+
+                <label class="form-label">YouTube Video Link</label>
+                <input type="url" name="videos_youtube" class="form-control" placeholder="https://www.youtube.com/watch?v=..." />
+            `;
+
+            container.appendChild(div);
+        }
+    
         function addPdfInput(input) {
             if (input.files.length > 0) {
                 const container = document.getElementById('pdf-container');

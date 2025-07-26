@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const token = window.token;
     const videos_uploaded_id = window.videos_uploaded_id;
     const domain_id = window.domain_id;
+    const my_username = window.my_username;
+    const my_id = window.my_id;
 
 
     console.log("Session ID: ", session_id);
@@ -253,30 +255,121 @@ document.addEventListener("DOMContentLoaded", () => {
                                 });
                         });
 
-                        // ---------- Carregar Exercícios ----------
-                        // fetch(`/gateway/domains/${domain_id}/exercises`, {
-                        //     headers: {
-                        //         "Authorization": `Bearer ${token}`
-                        //     }
-                        // })
-                        //     .then(res => res.json())
-                        //     .then(data => {
-                        //         const container = document.getElementById("exercise_container");
-                        //         container.innerHTML = "";
-                        //         if (data.length === 0) {
-                        //             container.innerHTML = "<p class='text-muted'>Nenhum exercício encontrado.</p>";
-                        //             return;
-                        //         }
-                        //         data.forEach(ex => {
-                        //             const div = document.createElement("div");
-                        //             div.className = "mb-3 border rounded p-2 bg-light";
-                        //             div.innerHTML = `<strong>${ex.question}</strong><br>${ex.options.map((opt, i) => `<div>${i + 1}) ${opt}</div>`).join("")}`;
-                        //             container.appendChild(div);
-                        //         });
-                        //     })
-                        //     .catch(err => {
-                        //         console.error("Erro ao carregar exercícios:", err);
-                        //     });
+                        // ----------Carregar Exercícios----------
+                        fetch(`/domains/${domain_id}/exercises`, {
+                            headers: {
+                                "Authorization": `Bearer ${token}`
+                            }
+                        })
+                            .then(res => res.json())
+                            .then(data => {
+                                const container = document.getElementById("exercise_container");
+
+                                if (data.length === 0) {
+                                    container.innerHTML = "<p class='text-muted'>Nenhum exercício encontrado.</p>";
+                                    return;
+                                }
+
+                                // Cria o formulário principal
+                                const form = document.createElement("form");
+                                form.id = "exerciseForm";
+
+                                console.log("Exercícios carregados:", data);
+
+                                // Para cada exercício, cria um bloco com as perguntas
+                                data.forEach((ex, index) => {
+                                    const div = document.createElement("div");
+                                    div.className = "mb-3 border rounded p-2 bg-light";
+                                    div.innerHTML = `
+                <p><strong>${index + 1}) ${ex.question}</strong></p>
+                ${ex.options.map((opt, i) => `
+                    <div>
+                        <input type="radio" name="exercise_${ex.id}" value="${i}" required>
+                        ${i + 1}) ${opt}
+                    </div>
+                `).join("")}
+            `;
+                                    form.appendChild(div);
+                                });
+
+                                // Botão de envio e feedback
+                                form.innerHTML += `
+            <button type="submit" class="btn btn-primary mt-3">Enviar respostas</button>
+            <div id="formFeedback" class="mt-2 text-danger"></div>
+        `;
+
+                                container.innerHTML = ""; // Limpa qualquer conteúdo anterior
+                                container.appendChild(form); // Insere o formulário
+
+                                // Adiciona o event listener de envio DEPOIS de inserir no DOM
+                                form.addEventListener("submit", function (e) {
+                                    e.preventDefault();
+
+                                    const studentName = my_username;
+                                    const studentId = my_id;
+
+                                    if (!studentName || !studentId) {
+                                        document.getElementById("formFeedback").textContent = "Preencha nome e ID do aluno.";
+                                        return;
+                                    }
+
+                                    const formData = new FormData(e.target);
+                                    const answers = [];
+
+                                    for (const [key, value] of formData.entries()) {
+                                        if (key.startsWith("exercise_")) {
+                                            const exerciseId = key.split("_")[1];
+                                            answers.push({
+                                                exercise_id: parseInt(exerciseId),
+                                                answer: parseInt(value)
+                                            });
+                                        }
+                                    }
+
+                                    const totalQuestions = data.length; // Cada objeto em `data` é uma pergunta
+                                    if (answers.length !== totalQuestions) {
+                                        document.getElementById("formFeedback").textContent = "Responda todas as questões antes de enviar.";
+                                        return;
+                                    }
+
+
+                                    fetch("/sessions/submit_answer", {
+                                        method: "POST",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                            "Authorization": `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({
+                                            student_id: studentId,
+                                            student_name: studentName,
+                                            answers: answers,
+                                            session_id: session_id,
+                                        })
+                                    })
+                                        .then(function (response) {
+                                            if (!response.ok) {
+                                                throw new Error("Erro ao enviar respostas");
+                                            }
+
+                                            response.json().then(data => {
+                                                document.getElementById("formFeedback").textContent = "Respostas enviadas com sucesso!";
+                                                console.log("Respostas enviadas:", data);
+                                                // form.reset(); // Limpa o formulário após o envio
+                                            });
+                                        });
+                                    // .then(response => {
+                                    //     alert("Respostas enviadas com sucesso!");
+                                    //     form.reset();
+                                    // })
+                                    // .catch(err => {
+                                    //     console.error("Erro ao enviar respostas:", err);
+                                    // });
+                                });
+                            })
+                            .catch(err => {
+                                console.error("Erro ao carregar exercícios:", err);
+                            });
+
 
                         // ---------- Carregar Vídeos ----------
                         fetch(`/domains/${domain_id}/videos`, {
@@ -304,7 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                         allowfullscreen></iframe>`;
                                     container.appendChild(div);
                                 });
-                                
+
                                 videos_json.videos_uploaded.forEach(video => {
                                     const videoTag = document.createElement("video");
                                     const div = document.createElement("div");

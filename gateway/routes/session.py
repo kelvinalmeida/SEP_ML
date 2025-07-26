@@ -1,4 +1,6 @@
 import json
+import logging
+import sys
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from requests.exceptions import RequestException
 import requests
@@ -134,7 +136,7 @@ def get_session_by_id(session_id, current_user=None):
         domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()
         session["domains"] = domains
 
-        # return f"{session}"
+        return f"{session}"
         return render_template("control/show_session.html", session=session, current_user=current_user)
 
     except RequestException as e:
@@ -185,6 +187,72 @@ def end_session(session_id, current_user=None):
         return (response.text, response.status_code, response.headers.items())
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
+
+
+
+@session_bp.route("/sessions/submit_answer", methods=["POST"])
+@token_required
+def submit_answer(current_user=None):
+    try:
+        data = request.get_json()
+        # answer = data['answers']
+
+
+        
+        # Corrrige as respostas do exercício
+        verified_answers = requests.post(f"{DOMAIN_URL}/exerc/testscores", json=data).json()
+
+        playload = {
+            "student_id": verified_answers["student_id"],
+            "student_name": verified_answers["student_name"],
+            "session_id": data["session_id"],
+            "answers": verified_answers["answers"]
+        }
+
+        logging.basicConfig(level=logging.INFO)
+        logging.info("🔍 verified_answers: %s", playload)
+        sys.stdout.flush()
+        
+        # Envia as respostas verificadas para o microserviço de controle
+        requests.post(f"{CONTROL_URL}/sessions/submit_answer", json=playload)
+
+        # Por enquanto apenas retorna os dados recebidos
+        return jsonify(data), 200
+
+    except Exception as e:
+        import traceback
+        logging.info("❌ Erro interno no servidor:")
+        traceback.print_exc()  # Mostra a stack completa do erro
+        return jsonify({"error": str(e)}), 500
+
+
+# @session_bp.route("/sessions/submit_answer", methods=["POST"])
+# @token_required
+# def submit_answer(current_user=None):
+#     data = request.get_json()
+
+#     return jsonify(data), 200
+#     exercise_id = data.get("exercise_id")
+#     selected_option = data.get("selected_option")
+#     student_id = data.get("student_id")
+#     student_name = data.get("student_name")
+
+#     if not all([exercise_id, selected_option, student_id, student_name]):
+#         return jsonify({"error": "Missing data"}), 400
+
+#     # Aqui você pode salvar no banco, por exemplo:
+#     resposta = ExerciseAnswer(
+#         exercise_id=exercise_id,
+#         selected_option=selected_option,
+#         student_id=student_id,
+#         student_name=student_name
+#     )
+#     db.session.add(resposta)
+#     db.session.commit()
+
+#     return jsonify({"message": "Resposta enviada com sucesso!"}), 200
+
+    
     
 
 

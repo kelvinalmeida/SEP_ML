@@ -1,4 +1,6 @@
 import json
+import logging
+import sys
 from flask import request, redirect, url_for, render_template, send_file, Blueprint, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
@@ -23,16 +25,20 @@ def create_domain():
     name = request.form.get('name')
     description = request.form.get('description')
     exercises_raw = request.form.get('exercises')
-    youtube_link = request.form.get('youtube_link')  # novo campo
+    
+    # Corrigido: agora pega múltiplos links do YouTube
+    youtube_links = request.form.getlist('youtube_link')
 
+    # Corrigido: agora pega múltiplos PDFs e múltiplos vídeos
     pdf_files = request.files.getlist("pdfs")
-    video_file = request.files.get("video")  # apenas um vídeo por upload
+    video_files = request.files.getlist("video")
 
+    # Criação do domínio
     new_domain = Domain(name=name, description=description)
     db.session.add(new_domain)
     db.session.commit()
 
-    # PDFs
+    # Salva PDFs
     for file in pdf_files:
         if file and file.filename.endswith('.pdf'):
             filename = secure_filename(file.filename)
@@ -42,21 +48,24 @@ def create_domain():
             pdf = PDF(filename=filename, path=path, domain_id=new_domain.id)
             db.session.add(pdf)
 
-    # Vídeo de upload (mp4)
-    if video_file and video_file.filename.endswith('.mp4'):
-        filename = secure_filename(video_file.filename)
-        path = os.path.join(UPLOAD_FOLDER, filename)
-        video_file.save(path)
+    # Salva vídeos enviados
+    for video_file in video_files:
+        if video_file and video_file.filename.endswith('.mp4'):
+            filename = secure_filename(video_file.filename)
+            path = os.path.join(UPLOAD_FOLDER, filename)
+            video_file.save(path)
 
-        video = VideoUpload(filename=filename, path=path, domain_id=new_domain.id)
-        db.session.add(video)
+            video = VideoUpload(filename=filename, path=path, domain_id=new_domain.id)
+            db.session.add(video)
 
-    # Vídeo do YouTube
-    if youtube_link:
-        yt = VideoYoutube(url=youtube_link.strip(), domain_id=new_domain.id)
-        db.session.add(yt)
+    # Salva links do YouTube
+    for yt_url in youtube_links:
+        yt_url = yt_url.strip()
+        if yt_url:
+            yt = VideoYoutube(url=yt_url, domain_id=new_domain.id)
+            db.session.add(yt)
 
-    # Exercícios
+    # Salva exercícios
     if exercises_raw:
         try:
             exercises = json.loads(exercises_raw)
@@ -98,6 +107,17 @@ def delete_domain(domain_id):
             os.remove(pdf.path)
         db.session.delete(pdf)
 
+    # Delete associated videos
+    for video in domain.videos_uploaded:
+        if os.path.exists(video.path):
+            os.remove(video.path)
+        db.session.delete(video)
+    for video in domain.videos_youtube:
+        db.session.delete(video)    
+    # Delete associated exercises
+    for exercise in domain.exercises:
+        db.session.delete(exercise)
+
     db.session.delete(domain)
     db.session.commit()
     
@@ -110,17 +130,28 @@ def get_domain(domain_id):
     return jsonify(domain.to_dict()), 200
 
 
+@domain_bp.route('/pdfs', methods=['GET'])
+def list_pdfs():
+    pdfs = PDF.query.all()
+    pdfs_json = [pdf.to_dict() for pdf in pdfs]
+    return jsonify(pdfs_json), 200
+
+
 @domain_bp.route('/pdfs/<int:pdf_id>', methods=['GET'])
 def download_pdf(pdf_id):
-    pdf = PDF.query.get_or_404(pdf_id)
-    file_path = pdf.path
-    
+    # return "oi"
+    try:
+        pdf = PDF.query.get_or_404(pdf_id)
+        
+        # Usa caminho absoluto
+        file_path = os.path.abspath(pdf.path)
+        # return f"{file_path}"
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
 
-    if not os.path.exists(file_path):
-        return jsonify({'error': 'File not found'}), 404
-
-    return send_file(file_path, as_attachment=True)
-
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @domain_bp.route('/domains/ids_to_names', methods=['GET'])
 def ids_to_names():
@@ -177,3 +208,44 @@ def get_uploaded_video(video_id):
         return jsonify({'error': 'File not found on server'}), 404
     
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@domain_bp.route('/exerc/testscores', methods=['POST'])
+def get_test_scores():
+    request_data = request.json
+
+    logging.basicConfig(level=logging.INFO)
+    logging.info("🔍 Dados recebidos domain: %s", request_data)
+    sys.stdout.flush()
+
+    student_name = request_data.get('student_name')
+    student_id = request_data.get('student_id')
+    answers = request_data.get('answers') # Array de respostas do aluno
+
+    for answer in answers:
+        exercise = Exercise.query.get_or_404(answer['exercise_id'])
+
+        # logging.basicConfig(level=logging.INFO)
+        # print("answer['answer'] == exercise.correct", answer['answer'], exercise.correct)
+        # print("answer['answer'] == exercise.correct", int(answer['answer']) == int(exercise.correct))
+        # sys.stdout.flush()
+
+        if int(answer['answer']) == int(exercise.correct):
+            answer['correct'] = True
+        else:
+            answer['correct'] = False
+
+    
+    playload = {
+        "student_name": student_name,
+        "student_id": student_id,
+        "answers": answers
+    }
+
+
+    logging.basicConfig(level=logging.INFO)
+    logging.info("🔍 Respostas verificadas: %s", playload)
+    sys.stdout.flush()
+
+
+    return jsonify(playload), 200

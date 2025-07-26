@@ -1,5 +1,7 @@
+import logging
+import sys
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from app.models import Session
+from app.models import Session, VerifiedAnswers
 from app import db
 from datetime import datetime
 
@@ -44,7 +46,9 @@ def list_sessions():
 def get_session_by_id(session_id):
     session = Session.query.get(session_id)
     if session:
-        return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students,  "domains": session.domains,  "start_time": session.start_time}), 200
+        return jsonify(session.to_dict()), 200
+        # return jsonify({"id": session.id, "status": session.status, "strategies": session.strategies, "teachers": session.teachers, "students": session.students,  "domains": session.domains,  "start_time": session.start_time}), 200
+        
     return jsonify({"error": "Session not found"}), 404
     
 
@@ -86,3 +90,24 @@ def end_session(session_id):
     return jsonify({"error": "Session not found"}), 404
 
 
+@session_bp.route('/sessions/submit_answer', methods=['POST'])
+def submit_answer():
+    data = request.get_json()
+
+    new_verified_answer = VerifiedAnswers(
+        student_name=data['student_name'],
+        student_id=data['student_id'],
+        answers=data['answers'],
+        session_id=data['session_id']
+    )
+
+    db.session.add(new_verified_answer)
+    db.session.commit()
+
+    logging.basicConfig(level=logging.INFO)
+    logging.info("🔍 dados das respostas no micr. control: %s", data)
+    sys.stdout.flush()
+
+    # Aqui você pode validar ou simular algo com os dados
+    # Por enquanto apenas retorna os dados recebidos
+    return jsonify(data), 200

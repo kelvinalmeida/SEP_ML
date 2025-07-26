@@ -152,8 +152,13 @@
         window.session_id = "{{ session.id }}";
         window.token = "{{ token }}";
         let session_json = {{ session | tojson }};
+        let current_user_json = {{ current_user | tojson }};
         window.videos_uploaded_id = session_json.domains[0].videos_uploaded[0].id;
         window.domain_id = session_json.domains[0].id;
+        window.my_username = current_user_json.username;
+        window.my_id = current_user_json.id;
+        console.log("current_user:", current_user_json);
+        // console.log(typeof session_json); // Agora será 'object'
         // console.log()
         // console.log(typeof session_json); // Agora será 'object'
         // window.myUserId = "{{ current_user['id'] }}";
@@ -161,11 +166,11 @@
         // console.log("Chat ID:", window.chatId);
     </script>
 
-    <script src="{{ url_for('static', filename='js/show_session.js') }}"></script>
 
     <!-- Bootstrap Bundle (inclui Popper) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+    <script src="{{ url_for('static', filename='js/show_session.js') }}"></script>
 
 </body>
 
