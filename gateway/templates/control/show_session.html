@@ -28,7 +28,8 @@
 </head>
 
 <body class="bg-light">
-    <div class="container mt-5">
+    <div class="container my-5">
+        <a href="/sessions" class="btn btn-outline-primary m-3">← Back to Sessions</a>
         <div class="card shadow-lg">
             <div class="card-header bg-primary text-white">
                 <h4 class="mb-0">Session #{{ session.id }}</h4>
@@ -119,33 +120,87 @@
                     {% endif %}
                 </div>
 
-                <!-- Professores -->
-                <div class="mb-3">
-                    <h5 class="text-decoration-underline">Teachers</h5>
-                    {% if session.teachers %}
-                    {% for teacher in session.teachers %}
-                    <span class="badge bg-success me-1">{{ teacher }}</span>
+                <!-- Resultado dos Exercícios -->
+                <h5 class="text-decoration-underline">Exercícios Respondidos nesta sessão</h5>
+                {% if current_user.type != 'student' %}
+                <div class="container my-4">
+                    {% for ans in session.verified_answers %}
+                    <div class="card mb-3 shadow-sm">
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                <h5 class="card-title text-primary">{{ ans.student_name }}</h5>
+                                <h6 class="card-subtitle mb-3 text-success">Pontuação: {{ ans.score }}</h6>
+                                {% for answer in ans.answers %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>Exercício <strong>{{ answer.exercise_id }}</strong> | Resposta: {{
+                                        answer.answer }}</span>
+                                    {% if answer.correct %}
+                                    <span class="badge bg-success">Acertou</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Errou</span>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
                     {% endfor %}
-                    {% else %}
-                    <em>No teachers assigned.</em>
-                    {% endif %}
                 </div>
-
-                <!-- Alunos -->
-                <div class="mb-3">
-                    <h5 class="text-decoration-underline">Students</h5>
-                    {% if session.students %}
-                    {% for student in session.students %}
-                    <span class="badge bg-secondary me-1">{{ student }}</span>
-                    {% endfor %}
-                    {% else %}
-                    <em>No students assigned.</em>
-                    {% endif %}
+                {% else %}
+                {% if current_user.type == 'student' %}
+                {% for ans in session.verified_answers %}
+                {% if ans.student_name == current_user.username %}
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">{{ ans.student_name }}</h5>
+                        <h6 class="card-subtitle mb-3 text-success">Pontuação: {{ ans.score }}</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for answer in ans.answers %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Exercício <strong>{{ answer.exercise_id }}</strong> | Resposta: {{ answer.answer
+                                    }}</span>
+                                {% if answer.correct %}
+                                <span class="badge bg-success">Acertou</span>
+                                {% else %}
+                                <span class="badge bg-danger">Errou</span>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 </div>
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+            </div>
+            {% endif %}
 
-                <a href="/sessions" class="btn btn-outline-primary mt-3">← Back to Sessions</a>
+
+            <!-- Professores -->
+            <div class="m-3">
+                <h5 class="text-decoration-underline">Teachers</h5>
+                {% if session.teachers %}
+                {% for teacher in session.teachers %}
+                <span class="badge bg-success me-1">{{ teacher }}</span>
+                {% endfor %}
+                {% else %}
+                <em>No teachers assigned.</em>
+                {% endif %}
+            </div>
+
+            <!-- Alunos -->
+            <div class="m-3">
+                <h5 class="text-decoration-underline">Students</h5>
+                {% if session.students %}
+                {% for student in session.students %}
+                <span class="badge bg-secondary me-1">{{ student }}</span>
+                {% endfor %}
+                {% else %}
+                <em>No students assigned.</em>
+                {% endif %}
             </div>
         </div>
+    </div>
     </div>
 
     <script>

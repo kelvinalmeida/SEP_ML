@@ -352,7 +352,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                             }
 
                                             response.json().then(data => {
-                                                document.getElementById("formFeedback").textContent = "Respostas enviadas com sucesso!";
+                                                document.getElementById("formFeedback").textContent = data.resp;
                                                 console.log("Respostas enviadas:", data);
                                                 // form.reset(); // Limpa o formulário após o envio
                                             });

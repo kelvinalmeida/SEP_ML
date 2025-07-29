@@ -222,6 +222,8 @@ def get_test_scores():
     student_id = request_data.get('student_id')
     answers = request_data.get('answers') # Array de respostas do aluno
 
+    score = 0;
+
     for answer in answers:
         exercise = Exercise.query.get_or_404(answer['exercise_id'])
 
@@ -232,6 +234,7 @@ def get_test_scores():
 
         if int(answer['answer']) == int(exercise.correct):
             answer['correct'] = True
+            score += 1
         else:
             answer['correct'] = False
 
@@ -239,7 +242,8 @@ def get_test_scores():
     playload = {
         "student_name": student_name,
         "student_id": student_id,
-        "answers": answers
+        "answers": answers,
+        "score": score,
     }
 
 

@@ -30,6 +30,7 @@ class VerifiedAnswers(db.Model):
     student_name = db.Column(db.String(100), nullable=False)
     student_id = db.Column(db.String(50), nullable=False)
     answers = db.Column(PickleType, nullable=False)  # Array de respostas do aluno
+    score = db.Column(db.Integer, nullable=False, default=0)  # Novo campo para armazenar a pontuação
     session_id = db.Column(db.Integer, db.ForeignKey('session.id'), nullable=False)
 
     def to_dict(self):
@@ -38,5 +39,6 @@ class VerifiedAnswers(db.Model):
             'student_name': self.student_name,
             'student_id': self.student_id,
             'answers': self.answers,
+            'score': self.score,  # Incluindo a pontuação no dicionário
             'session_id': self.session_id
         }

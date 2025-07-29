@@ -40,7 +40,8 @@ def create_session():
 @session_bp.route('/sessions', methods=['GET'])
 def list_sessions():
     all_sessions = Session.query.all()
-    return jsonify([{"id": s.id, "status": s.status, "strategies": s.strategies, "teachers": s.teachers, "students": s.students, "domains": s.domains} for s in all_sessions])
+    return jsonify([s.to_dict() for s in all_sessions])
+    # return jsonify([{"id": s.id, "status": s.status, "strategies": s.strategies, "teachers": s.teachers, "students": s.students, "domains": s.domains} for s in all_sessions])
 
 @session_bp.route('/sessions/<int:session_id>', methods=['GET'])
 def get_session_by_id(session_id):
@@ -93,11 +94,17 @@ def end_session(session_id):
 @session_bp.route('/sessions/submit_answer', methods=['POST'])
 def submit_answer():
     data = request.get_json()
+    
+    verified_answers = VerifiedAnswers.query.filter_by(student_id=data['student_id'], session_id=data['session_id']).first()
+
+    if verified_answers:
+        return jsonify({"error": "Answer already submitted for this student"}), 409
 
     new_verified_answer = VerifiedAnswers(
         student_name=data['student_name'],
         student_id=data['student_id'],
         answers=data['answers'],
+        score=data.get('score', 0),  # Use the score from the data or default to 0
         session_id=data['session_id']
     )
 
