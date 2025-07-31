@@ -10,7 +10,9 @@ class Session(db.Model):
     students = db.Column(PickleType, nullable=False, default=[])
     domains = db.Column(PickleType, nullable=False, default=[])
     start_time = db.Column(db.DateTime)  # Novo campo para armazenar o horário de início
+
     verified_answers = db.relationship('VerifiedAnswers', backref='session', lazy='joined');
+    estra_notes = db.relationship('ExtraNotes', backref='session', lazy='joined')
 
     def to_dict(self):
         return {
@@ -21,7 +23,24 @@ class Session(db.Model):
             'students': self.students,
             'domains': self.domains,
             'start_time': self.start_time,
-            'verified_answers': [va.to_dict() for va in self.verified_answers]
+            'verified_answers': [va.to_dict() for va in self.verified_answers],
+            'extra_notes': [en.to_dict() for en in self.estra_notes]
+        }
+    
+class ExtraNotes(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    estudante_username = db.Column(db.String(100), nullable=False)
+    student_id = db.Column(db.Integer, nullable=False)
+    extra_notes = db.Column(db.Float, nullable=False, default=0.0)
+    session_id = db.Column(db.Integer, db.ForeignKey('session.id'), nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'estudante_username': self.estudante_username,
+            'extra_notes': self.extra_notes,
+            'session_id': self.session_id
         }
 
 

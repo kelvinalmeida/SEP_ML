@@ -16,6 +16,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const my_id = window.my_id;
 
 
+    // Verificar se o susuatio tem notas extras, se não tiver, exibir mensagem
+    let student_extra_note = document.getElementById("student-extra-note-card-created");
+    if (!student_extra_note) {
+        document.getElementById("student-extra-note-card").innerHTML = '<em>Sem notas extras atribuidas.</em>';
+    }
+
+    // Verificar se o usuário é estudante e se não tem respostas de exercícios, exibir mensagem
+    let student_answers_card = document.getElementById("student-answers-card-created");
+    console.log("student_answers_card_created: ", student_answers_card);
+    if (!student_answers_card) {
+        console.log("student_answers_card>>: ", document.getElementById("student-answers-card"));
+        document.getElementById("student-answers-card").innerHTML = '<em>Sem respostas de exercícios enviadas nesta sessão.</em>';
+    }
+
+
+
     console.log("Session ID: ", session_id);
 
     taticDescription("Sessão finalizada ou sem tática ativa no momento.");

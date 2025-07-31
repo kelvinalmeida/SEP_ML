@@ -1,8 +1,10 @@
 import json
 import logging
 import sys
+from urllib import response
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from requests.exceptions import RequestException
+from flask import Response
 import requests
 from .auth import token_required
 from datetime import datetime
@@ -132,12 +134,16 @@ def get_session_by_id(session_id, current_user=None):
         students = requests.get(f"{USER_URL}/students/ids_to_usernames", params=students_params).json()
         session["students"] = students["usernames"] 
 
+        studantes_with_id_and_username = requests.get(f"{USER_URL}/students").json()
+        session["students_ids_with_usernames"] = students['ids_with_usernames']
+
         domains_params = { 'ids': session.get("domains", [])}
         domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()
         session["domains"] = domains
 
+
         # return f"{session}"
-        return render_template("control/show_session.html", session=session, current_user=current_user)
+        return render_template("control/show_session.html", session=session, current_user=current_user, studantes_with_id_and_username=studantes_with_id_and_username)
 
     except RequestException as e:
         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
@@ -225,6 +231,26 @@ def submit_answer(current_user=None):
         logging.info("❌ Erro interno no servidor:")
         traceback.print_exc()  # Mostra a stack completa do erro
         return jsonify({"error": str(e)}), 500
+    
+
+@session_bp.route("/studant/extranotes/<int:student_id>", methods=["POST"])
+@token_required
+def add_extra_notes(student_id, current_user=None):
+    data = request.form.get("extra_notes")
+    session_id = request.form.get("session_id")
+
+    student = requests.get(f"{USER_URL}/students/{student_id}").json()
+
+    playload = {
+        "student_id": student.get("id"),
+        "estudante_username": student.get("username"),
+        "extra_notes": float(data),
+        "session_id": session_id,
+    }
+
+    requests.post(f"{CONTROL_URL}/sessions/add_extra_notes", json=playload)
+
+    return Response(status=204)
   
 
 @session_bp.route('/sessions/<int:session_id>/current_tactic', methods=['GET'])

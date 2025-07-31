@@ -120,10 +120,82 @@
                     {% endif %}
                 </div>
 
+                <!-- Notas extras, colocada pelo professor! -->
+                <h5 class="mb-4 text-decoration-underline d-flex align-items-center">
+                    <i class="bi bi-pencil-square my-2"></i>Notas Extras
+                </h5>
+                {% if current_user.type != 'student' %}
+                <div class="container my-5">
+                    {% if session.students %}
+
+                    {% for student in session.students_ids_with_usernames %}
+                    <form action="/studant/extranotes/{{student.id}}" method="post"
+                        class="row g-2 align-items-center mb-3">
+                        <div class="col-auto">
+                            <span class="badge bg-primary fs-6">{{ student.username }}</span>
+                        </div>
+                        <div class="col-auto">
+                            <input type="number" name="extra_notes" min="0" max="10" class="form-control"
+                                placeholder="0 ... 10" required>
+                            <input type="text" name="session_id" value="{{ session.id }}" hidden>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-success">Atribuir Nota</button>
+                        </div>
+                    </form>
+                    {% endfor %}
+                    {% else %}
+                    <em class="text-muted">Nenhum aluno atribuído.</em>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if current_user.type == 'teacher' %}
+                <div class="container my-4">
+                    <div class="row g-3" id="student-extra-note-card">
+                        {% for ext_note in session.extra_notes %}
+                        <div class="col-sm-6 col-md-4 col-lg-3" id="student-extra-note-card-created">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary">{{ ext_note.estudante_username }}</h5>
+                                    <h6 class="card-subtitle mb-2 text-success">Nota Atribuída:</h6>
+                                    <p class="card-text display-6">{{ ext_note.extra_notes }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                <!-- Notas Extras, colocada pelo aluno! -->
+                {% if current_user.type == 'student' %}
+                <div class="container my-4">
+                    <div class="row g-3" id="student-extra-note-card">
+                        {% if session.extra_notes %}
+                        {% for ext_note in session.extra_notes %}
+                        {% if ext_note.estudante_username == current_user.username %}
+                        <div class="col-sm-6 col-md-4 col-lg-3" id="student-extra-note-card-created">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary">{{ ext_note.estudante_username }}</h5>
+                                    <h6 class="card-subtitle mb-2 text-success">Nota Atribuída:</h6>
+                                    <p class="card-text display-6">{{ ext_note.extra_notes }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+
                 <!-- Resultado dos Exercícios -->
                 <h5 class="text-decoration-underline">Exercícios Respondidos nesta sessão</h5>
                 {% if current_user.type != 'student' %}
-                <div class="container my-4">
+                <div class="container my-4" id="student-answers-card">
+                    {% if session.verified_answers %}
                     {% for ans in session.verified_answers %}
                     <div class="card mb-3 shadow-sm">
                         <div class="card-body">
@@ -131,7 +203,8 @@
                                 <h5 class="card-title text-primary">{{ ans.student_name }}</h5>
                                 <h6 class="card-subtitle mb-3 text-success">Pontuação: {{ ans.score }}</h6>
                                 {% for answer in ans.answers %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <li class="list-group-item d-flex justify-content-between align-items-center"
+                                    id="student-answers-card-created">
                                     <span>Exercício <strong>{{ answer.exercise_id }}</strong> | Resposta: {{
                                         answer.answer }}</span>
                                     {% if answer.correct %}
@@ -146,58 +219,62 @@
                     </div>
                     {% endfor %}
                 </div>
+                {% endif %}
+
                 {% else %}
-                {% if current_user.type == 'student' %}
-                {% for ans in session.verified_answers %}
-                {% if ans.student_name == current_user.username %}
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title text-primary">{{ ans.student_name }}</h5>
-                        <h6 class="card-subtitle mb-3 text-success">Pontuação: {{ ans.score }}</h6>
-                        <ul class="list-group list-group-flush">
-                            {% for answer in ans.answers %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <span>Exercício <strong>{{ answer.exercise_id }}</strong> | Resposta: {{ answer.answer
-                                    }}</span>
-                                {% if answer.correct %}
-                                <span class="badge bg-success">Acertou</span>
-                                {% else %}
-                                <span class="badge bg-danger">Errou</span>
-                                {% endif %}
-                            </li>
-                            {% endfor %}
-                        </ul>
+                <div id="student-answers-card" class="container my-4">
+                    {% for ans in session.verified_answers %}
+                    {% if ans.student_name == current_user.username %}
+                    <div class="card mb-3 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary">{{ ans.student_name }}</h5>
+                            <h6 class="card-subtitle mb-3 text-success">Pontuação: {{ ans.score }}</h6>
+                            <ul class="list-group list-group-flush">
+                                {% for answer in ans.answers %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center"
+                                    id="student-answers-card-created">
+                                    <span>Exercício <strong>{{ answer.exercise_id }}</strong> | Resposta: {{
+                                        answer.answer
+                                        }}</span>
+                                    {% if answer.correct %}
+                                    <span class="badge bg-success">Acertou</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Errou</span>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
                     </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
                 </div>
-                {% endif %}
-                {% endfor %}
-                {% endif %}
-            </div>
-            {% endif %}
 
 
-            <!-- Professores -->
-            <div class="m-3">
-                <h5 class="text-decoration-underline">Teachers</h5>
-                {% if session.teachers %}
-                {% for teacher in session.teachers %}
-                <span class="badge bg-success me-1">{{ teacher }}</span>
-                {% endfor %}
-                {% else %}
-                <em>No teachers assigned.</em>
-                {% endif %}
-            </div>
+                <!-- Professores -->
+                <div class="m-3">
+                    <h5 class="text-decoration-underline">Teachers</h5>
+                    {% if session.teachers %}
+                    {% for teacher in session.teachers %}
+                    <span class="badge bg-success me-1">{{ teacher }}</span>
+                    {% endfor %}
+                    {% else %}
+                    <em>No teachers assigned.</em>
+                    {% endif %}
+                </div>
 
-            <!-- Alunos -->
-            <div class="m-3">
-                <h5 class="text-decoration-underline">Students</h5>
-                {% if session.students %}
-                {% for student in session.students %}
-                <span class="badge bg-secondary me-1">{{ student }}</span>
-                {% endfor %}
-                {% else %}
-                <em>No students assigned.</em>
-                {% endif %}
+                <!-- Alunos -->
+                <div class="m-3">
+                    <h5 class="text-decoration-underline">Students</h5>
+                    {% if session.students %}
+                    {% for student in session.students %}
+                    <span class="badge bg-secondary me-1">{{ student }}</span>
+                    {% endfor %}
+                    {% else %}
+                    <em>No students assigned.</em>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>

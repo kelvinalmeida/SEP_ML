@@ -1,7 +1,7 @@
 import logging
 import sys
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from app.models import Session, VerifiedAnswers
+from app.models import Session, VerifiedAnswers, ExtraNotes
 from app import db
 from datetime import datetime
 
@@ -118,3 +118,44 @@ def submit_answer():
     # Aqui você pode validar ou simular algo com os dados
     # Por enquanto apenas retorna os dados recebidos
     return jsonify(data), 200
+
+
+@session_bp.route("/sessions/add_extra_notes", methods=["POST"])
+def add_extra_notes():
+
+    logging.basicConfig(level=logging.INFO)
+    logging.info("oiiiiiii")
+    sys.stdout.flush()
+
+    data = request.json
+
+    extra_notes = float(data.get("extra_notes", 0.0))
+    session_id = int(data.get("session_id"))
+    student_id = int(data.get("student_id", 0))
+    estudante_username = data.get("estudante_username", "")
+
+    
+
+    estudent_extra_notes = ExtraNotes.query.filter_by(estudante_username=estudante_username, session_id=session_id).first()
+    
+    if estudent_extra_notes:
+        estudent_extra_notes.extra_notes = extra_notes
+        db.session.commit()
+        return jsonify({"message": "Extra notes updated successfully"}), 200
+
+    new_note = ExtraNotes(
+        estudante_username=data.get("estudante_username", ""),
+        student_id=student_id,
+        extra_notes=extra_notes,
+        session_id=session_id
+    )
+
+    logging.basicConfig(level=logging.INFO)
+    logging.info("🔍 new_note: %s", new_note)
+    sys.stdout.flush()
+
+
+    db.session.add(new_note)
+    db.session.commit()
+
+    return jsonify({"message": "Extra notes added successfully"}), 201

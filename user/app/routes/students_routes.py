@@ -58,11 +58,6 @@ def delete_student(student_id):
 @student_bp.route('/students/ids_to_usernames', methods=['GET'])
 def ids_to_names():
     ids = request.args.getlist('ids')
-    
-    # if not ids:
-    #     result = { "usernames": [],
-    #            "ids_with_usernames": [{"username": '', "id": '', 'type': 'estudante'}] }
-    #     return jsonify(result), 200
 
     try:
         # converte todos os ids para inteiros
