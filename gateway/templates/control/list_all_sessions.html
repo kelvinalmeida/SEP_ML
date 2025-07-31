@@ -19,6 +19,7 @@
         {% if sessions and sessions|length > 0 %}
         <div class="row">
             {% for session in sessions %}
+            {% if current_user.username in session.students or current_user.username in session.teachers %}
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card shadow-sm h-100">
                     <div class="card-body">
@@ -78,6 +79,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
             {% endfor %}
         </div>
         {% else %}

@@ -69,12 +69,13 @@ def list_sessions(current_user=None):
 
         # Mapear apenas os nomes por ID
         strategy_map = {str(item["id"]): item["name"] for item in strategy_data}
-        teacher_map = {str(item["id"]): item["name"] for item in teacher_data}
-        student_map = {str(item["id"]): item["name"] for item in student_data}
+        teacher_map = {str(item["id"]): item["username"] for item in teacher_data}
+        student_map = {str(item["id"]): item["username"] for item in student_data}
         domains_map = {str(item["id"]): item["name"] for item in domains_data}
         
         # return f"{domains_map}"
         # return f"{domains_map.get(sessions[0].get('domains', [])[0])}"
+
 
         for session in sessions:
             session["strategies"] = [
@@ -93,6 +94,8 @@ def list_sessions(current_user=None):
                 domains_map.get(str(sid), f"ID {sid}")
                 for sid in session.get("domains", [])
             ]
+
+        # return f"{sessions}"
         
         return render_template("control/list_all_sessions.html", sessions=sessions, current_user=current_user)
 
