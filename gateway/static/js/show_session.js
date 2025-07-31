@@ -31,7 +31,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-
     console.log("Session ID: ", session_id);
 
     taticDescription("Sessão finalizada ou sem tática ativa no momento.");

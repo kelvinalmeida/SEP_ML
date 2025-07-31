@@ -16,6 +16,17 @@
             <h2 class="mb-0">Created Sessions</h2>
         </div>
 
+        <form action="/sessions/enter/" method="post"
+            class="w-100 d-flex justify-content-center mb-4 flex-column align-items-center">
+            <p>Quer entrar em uma sessão? Digite o código dela!</p>
+            <div class="input-group mb-3 w-50">
+                <input type="text" class="form-control" name="session_code" placeholder="Enter Session Code" required>
+                <input type="number" name="requester_id" value="{{ current_user.id }}" hidden>
+                <input type="text" name="type" value="{{ current_user.type }}" hidden>
+                <button class="btn btn-primary" type="submit">Enter</button>
+            </div>
+        </form>
+
         {% if sessions and sessions|length > 0 %}
         <div class="row">
             {% for session in sessions %}

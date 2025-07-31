@@ -2,17 +2,40 @@ from . import db
 from sqlalchemy.types import PickleType
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
+import random
+import string
+
+from sqlalchemy.ext.mutable import MutableList
+
+
+def generate_unique_code(length=8):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
 class Session(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.String(50), nullable=False)
-    strategies = db.Column(PickleType, nullable=False, default=[])
-    teachers = db.Column(PickleType, nullable=False, default=[])
-    students = db.Column(PickleType, nullable=False, default=[])
-    domains = db.Column(PickleType, nullable=False, default=[])
-    start_time = db.Column(db.DateTime)  # Novo campo para armazenar o horário de início
+    strategies = db.Column(MutableList.as_mutable(PickleType), nullable=False, default=list)
+    teachers = db.Column(MutableList.as_mutable(PickleType), nullable=False, default=list)
+    students = db.Column(MutableList.as_mutable(PickleType), nullable=False, default=list)
+    domains = db.Column(MutableList.as_mutable(PickleType), nullable=False, default=list)
 
-    verified_answers = db.relationship('VerifiedAnswers', backref='session', lazy='joined');
+    code = db.Column(db.String(50), nullable=False, unique=True)
+    start_time = db.Column(db.DateTime)
+
+    verified_answers = db.relationship('VerifiedAnswers', backref='session', lazy='joined')
     estra_notes = db.relationship('ExtraNotes', backref='session', lazy='joined')
+
+    def __init__(self, *args, **kwargs):
+        if 'code' not in kwargs:
+            # Garante unicidade tentando até gerar um código único
+            while True:
+                generated_code = generate_unique_code()
+                if not Session.query.filter_by(code=generated_code).first():
+                    kwargs['code'] = generated_code
+                    break
+        super().__init__(*args, **kwargs)
 
     def to_dict(self):
         return {
@@ -21,11 +44,13 @@ class Session(db.Model):
             'strategies': self.strategies,
             'teachers': self.teachers,
             'students': self.students,
+            'code': self.code,
             'domains': self.domains,
             'start_time': self.start_time,
             'verified_answers': [va.to_dict() for va in self.verified_answers],
             'extra_notes': [en.to_dict() for en in self.estra_notes]
         }
+
     
 class ExtraNotes(db.Model):
     id = db.Column(db.Integer, primary_key=True)

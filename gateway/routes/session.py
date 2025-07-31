@@ -150,6 +150,27 @@ def get_session_by_id(session_id, current_user=None):
 
     except RequestException as e:
         return jsonify({"error": "Service unavailable", "details": str(e)}), 503
+    
+
+@session_bp.route('/sessions/enter/', methods=['POST'])
+@token_required
+def enter_session(current_user=None):
+
+    session_code = request.form.get('session_code')
+    requester_id = request.form.get('requester_id')
+    type = request.form.get('type')  # 'student' ou 'teacher'
+
+    playload = {
+        "session_code": session_code,
+        "requester_id": requester_id,
+        "type": type
+    }
+
+    # return jsonify(playload), 200
+
+    requests.post(f"{CONTROL_URL}/sessions/enter", json=playload)
+
+    return redirect(url_for('session.list_sessions'))
 
 
 @session_bp.route('/sessions/delete/<int:session_id>', methods=['POST'])

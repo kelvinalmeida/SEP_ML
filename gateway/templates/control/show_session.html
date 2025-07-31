@@ -24,6 +24,10 @@
             font-size: 1.2rem;
             padding: 0.6rem 1rem;
         }
+
+        .session-code {
+            font-size: 1.2rem;
+        }
     </style>
 </head>
 
@@ -51,6 +55,13 @@
                         Tempo de Aula {{ session.full_tatics_time }} min
                     </span>
                 </h5>
+
+                <!-- Código da Sessão -->
+                <p class="session-code my-5">
+                    Código da Sessão:
+                    <span class="badge bg-secondary" id="sessionCode">{{ session.code }}</span>
+                    <button id="copyBtn" class="btn btn-sm btn-outline-primary" onclick="copyCode()">Copiar</button>
+                </p>
 
                 <!-- Botão e cronômetro centralizados -->
                 <div class="centered-controls">
@@ -298,6 +309,36 @@
         // console.log("Chat ID:", window.chatId);
     </script>
 
+    <script>
+        function copyCode() {
+            const codeText = document.getElementById("sessionCode").innerText;
+            const copyButton = document.getElementById("copyBtn");
+
+            navigator.clipboard.writeText(codeText)
+                .then(() => {
+                    copyButton.innerHTML = "✅ Copiado!";
+                    copyButton.classList.remove("btn-outline-primary");
+                    copyButton.classList.add("btn-success");
+
+                    setTimeout(() => {
+                        copyButton.innerHTML = "Copiar";
+                        copyButton.classList.remove("btn-success");
+                        copyButton.classList.add("btn-outline-primary");
+                    }, 2000);
+                })
+                .catch(err => {
+                    copyButton.innerHTML = "Erro!";
+                    copyButton.classList.remove("btn-outline-primary");
+                    copyButton.classList.add("btn-danger");
+
+                    setTimeout(() => {
+                        copyButton.innerHTML = "Copiar";
+                        copyButton.classList.remove("btn-danger");
+                        copyButton.classList.add("btn-outline-primary");
+                    }, 2000);
+                });
+        }
+    </script>
 
     <!-- Bootstrap Bundle (inclui Popper) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

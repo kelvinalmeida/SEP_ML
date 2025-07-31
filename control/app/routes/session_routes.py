@@ -159,3 +159,32 @@ def add_extra_notes():
     db.session.commit()
 
     return jsonify({"message": "Extra notes added successfully"}), 201
+
+
+@session_bp.route('/sessions/enter', methods=['POST'])
+def enter_session():
+    data = request.get_json()
+
+    session_code = data.get('session_code')
+    requester_id = data.get('requester_id')
+    type = data.get('type')
+
+    session = Session.query.filter_by(code=session_code).first()
+
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+    
+    if type == 'student':
+        if requester_id not in session.students:
+            session.students.append(requester_id)
+            db.session.commit()
+    else:
+        if requester_id not in session.teachers:
+            session.teachers.append(requester_id)
+            db.session.commit()
+
+
+    db.session.refresh(session)
+
+    return jsonify({"success": "Entered session successfully"}), 200
+
