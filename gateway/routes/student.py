@@ -22,15 +22,17 @@ def create_students():
         student = {"name": name, "age": age, "course": course, "type": type, 'email': email, "username": username, "password": password}
         
         try:
-            all_students_usernames = requests.get(f"{USER_URL}/students/all_students_usernames").json()
-            all_teachers_usernames = requests.get(f"{USER_URL}/teachers/all_teachers_usernames").json()
+            # all_students_usernames = requests.get(f"{USER_URL}/students/all_students_usernames").json()
+            # all_teachers_usernames = requests.get(f"{USER_URL}/teachers/all_teachers_usernames").json()
             
-            # return f"{all_students_usernames} {all_teachers_usernames}"
-            if username in all_students_usernames["usernames"] or username in all_teachers_usernames["usernames"]:
-                return render_template("./user/create_student.html", error="Username already exists")
-
+            # # return f"{all_students_usernames} {all_teachers_usernames}"
+            # if username in all_students_usernames["usernames"] or username in all_teachers_usernames["usernames"]:
+            #     return render_template("./user/create_student.html", error="Username already exists")
+            # return 'po'
             response = requests.post(f"{USER_URL}/students/create", json=student)
-            if response.status_code == 200:
+
+            return jsonify(response.json()), response.status_code
+            if response.status_code == 201:
                 # json_response = response.json()
                 # return jsonify(json_response), 200
                 return render_template("./user/success.html")

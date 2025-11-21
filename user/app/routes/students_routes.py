@@ -1,24 +1,44 @@
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, current_app
 from ..models import Student
 from .. import db
+from db import create_connection
 
 student_bp = Blueprint("student_bp", __name__)
 
 @student_bp.route("/students/create", methods=["GET", "POST"])
 def create_student():
-    if request.method == "POST":
-        name = request.json["name"]
-        age = request.json["age"]
-        course = request.json["course"]
-        type = "student"
-        email = request.json["email"]
-        username = request.json["username"]
-        password = request.json["password"]
 
-        student = Student(name=name, age=age, course=course, type=type, email=email, username=username, password_hash=password)
-        db.session.add(student)
-        db.session.commit()
-        return jsonify({"message": "Aluno criado com sucesso!"}), 200
+    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+
+        try:
+            name = request.json["name"]
+            age = request.json["age"]
+            course = request.json["course"]
+            type = "student"
+            email = request.json["email"]
+            username = request.json["username"]
+            password = request.json["password"]
+            
+
+            add_student_query = """INSERT INTO students (name, age, course, type, email, username, password_hash)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s);"""
+            cursor.execute(add_student_query, (name, age, course, type, email, username, password))
+            conn.commit()
+
+            return jsonify({"message": "Aluno criado com sucesso!"}), 201
+        
+        except Exception as e:
+            conn.rollback()
+            cursor.close()
+            return jsonify({"error": str(e)}), 400
+            
+
+        # student = Student(name=name, age=age, course=course, type=type, email=email, username=username, password_hash=password)
+        # db.session.add(student)
+        # db.session.commit()
 
     return jsonify({"error": "Método não permitido"}), 405
 
