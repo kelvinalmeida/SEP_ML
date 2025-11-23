@@ -8,102 +8,315 @@ student_bp = Blueprint("student_bp", __name__)
 @student_bp.route("/students/create", methods=["GET", "POST"])
 def create_student():
 
+    # Tenta criar a conexão
     conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    
+    # FIX 1: Verifica se a conexão falhou (é None) antes de continuar
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+
     cursor = conn.cursor()
 
     if request.method == "POST":
-
         try:
-            name = request.json["name"]
-            age = request.json["age"]
-            course = request.json["course"]
-            type = "student"
-            email = request.json["email"]
-            username = request.json["username"]
-            password = request.json["password"]
-            
+            # Garante que o request tem JSON antes de acessar
+            if not request.is_json:
+                return jsonify({"error": "Content-Type must be application/json"}), 415
 
-            add_student_query = """INSERT INTO students (name, age, course, type, email, username, password_hash)
+            name = request.json.get("name")
+            age = request.json.get("age")
+            course = request.json.get("course")
+            type = "student"
+            email = request.json.get("email")
+            username = request.json.get("username")
+            password = request.json.get("password")
+            
+            add_student_query = """INSERT INTO student (name, age, course, type, email, username, password_hash)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s);"""
+            
             cursor.execute(add_student_query, (name, age, course, type, email, username, password))
             conn.commit()
+
+            # FIX 2: Fechar cursor e conexão no sucesso
+            cursor.close()
+            conn.close()
 
             return jsonify({"message": "Aluno criado com sucesso!"}), 201
         
         except Exception as e:
-            conn.rollback()
-            cursor.close()
+            # FIX 3: Rollback seguro e fechamento de recursos
+            if conn:
+                conn.rollback()
+                cursor.close()
+                conn.close()
             return jsonify({"error": str(e)}), 400
-            
 
-        # student = Student(name=name, age=age, course=course, type=type, email=email, username=username, password_hash=password)
-        # db.session.add(student)
-        # db.session.commit()
+    # Se for GET ou outro método, fecha a conexão que foi aberta no início
+    if conn:
+        conn.close()
 
     return jsonify({"error": "Método não permitido"}), 405
 
 @student_bp.route("/students", methods=["GET"])
 def get_students(): 
-    students = Student.query.all()
-    return jsonify([{"id": s.id, "name": s.name, "age": s.age, "course": s.course, "type": s.type, "username": s.username, "password": s.password_hash} for s in students])
+    # Tenta criar a conexão
+    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    
+    # FIX 1: Verifica se a conexão falhou (é None) antes de continuar
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    
+    cursor = conn.cursor()
+
+    try:
+        get_students_query = "SELECT student_id id, name, age, course, type, username, password_hash password FROM student;"
+        cursor.execute(get_students_query)
+        rows = cursor.fetchall()
+
+        students = []
+        # for row in rows:
+        #     student = Student(id=row[0], name=row[1], age=row[2], course=row[3], type=row[4], username=row[5], password_hash=row[6])
+        #     students.append(student)
+
+        # FECHAR ANTES DO RETURN
+        cursor.close()
+        conn.close()
+
+        # Se você tiver configurado o cursor para retornar dicionários (RealDictCursor), isso funciona direto.
+        # Se não, rows será uma lista de tuplas e o JSON ficará como arrays [[id, name...], ...].
+        return jsonify(rows), 200
+    except Exception as e:
+        # FIX 3: Rollback seguro e fechamento de recursos
+        if conn:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+        return jsonify({"error": str(e)}), 400
+
+    # return jsonify([{"id": s.id, "name": s.name, "age": s.age, "course": s.course, "type": s.type, "username": s.username, "password": s.password_hash} for s in students])
 
 @student_bp.route("/students/<int:student_id>", methods=["GET"])
 def get_student_by_id(student_id):
-    student = Student.query.get(student_id)
-    if student:
-        return jsonify({"id": student.id, "name": student.name, "age": student.age, "course": student.course, "username": student.username, "type": student.type})
-    return jsonify({"error": "Aluno não encontrado"}), 404
+    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    
+    cursor = conn.cursor()
+
+    try:
+        get_student_query = "SELECT student_id id, name, age, course, type, username, password_hash password FROM student WHERE student_id = %s;"
+        cursor.execute(get_student_query, (student_id,))
+        row = cursor.fetchone()
+
+        if row:
+            return jsonify(row), 200
+        else:
+            return jsonify({"error": "Aluno não encontrado"}), 404
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+        return jsonify({"error": str(e)}), 400
+
+    # student = Student.query.get(student_id)
+    # if student:
+    #     return jsonify({"id": student.id, "name": student.name, "age": student.age, "course": student.course, "username": student.username, "type": student.type})
+    # return jsonify({"error": "Aluno não encontrado"}), 404
 
 @student_bp.route("/students/<int:student_id>", methods=["PUT"])
 def update_student(student_id):
-    student = Student.query.get(student_id)
-    if student:
-        data = request.get_json()
-        student.name = data.get("name", student.name)
-        student.age = data.get("age", student.age)
-        student.course = data.get("course", student.course)
-        db.session.commit()
-        return jsonify({"message": "Aluno atualizado!", "student": data})
-    return jsonify({"error": "Aluno não encontrado"}), 404
+    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    
+    cursor = conn.cursor()
+    try:
+        name = request.json.get("name")
+        age = request.json.get("age")
+        course = request.json.get("course")
+
+        update_student_query = """UPDATE student 
+                                  SET name = %s, age = %s, course = %s 
+                                  WHERE student_id = %s;"""
+        
+        cursor.execute(update_student_query, (name, age, course, student_id))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "Aluno atualizado!"}), 200
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+        return jsonify({"error": str(e)}), 400
+    
+    # student = Student.query.get(student_id)
+    # if student:
+    #     data = request.get_json()
+    #     student.name = data.get("name", student.name)
+    #     student.age = data.get("age", student.age)
+    #     student.course = data.get("course", student.course)
+    #     db.session.commit()
+    #     return jsonify({"message": "Aluno atualizado!", "student": data})
+    # return jsonify({"error": "Aluno não encontrado"}), 404
 
 @student_bp.route("/students/<int:student_id>", methods=["DELETE"])
 def delete_student(student_id):
-    student = Student.query.get(student_id)
-    if student:
-        db.session.delete(student)
-        db.session.commit()
-        return jsonify({"message": "Aluno deletado!"})
-    return jsonify({"error": "Aluno não encontrado"}), 404
+    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
+    try:
+        delete_student_query = "DELETE FROM student WHERE student_id = %s;"
+        cursor.execute(delete_student_query, (student_id,))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "Aluno deletado!"}), 200
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+        return jsonify({"error": str(e)}), 400
+    # student = Student.query.get(student_id)
+    # if student:
+    #     db.session.delete(student)
+    #     db.session.commit()
+    #     return jsonify({"message": "Aluno deletado!"})
+    # return jsonify({"error": "Aluno não encontrado"}), 404
 
 @student_bp.route('/students/ids_to_usernames', methods=['GET'])
 def ids_to_names():
+    # 1. Pegar os IDs da URL
     ids = request.args.getlist('ids')
+    
+    # Se não houver IDs, retorna estrutura vazia imediatamente
+    if not ids:
+        result = { 
+            "usernames": [],
+            "ids_with_usernames": [{"username": '', "id": '', 'type': 'estudante'}] 
+        }
+        return jsonify(result), 200
+
+    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    
+    cursor = conn.cursor()
 
     try:
-        # converte todos os ids para inteiros
+        # 2. Converter para inteiros para segurança e sanitização
         ids = list(map(int, ids))
-        students = Student.query.filter(Student.id.in_(ids)).all()
 
-        result = { "usernames": [student.username for student in students],
-                "ids_with_usernames": [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students] }
+        # 3. Criar placeholders dinamicamente para o SQL (ex: "%s, %s, %s")
+        # Isso previne SQL Injection e permite passar uma lista de tamanho variável
+        placeholders = ', '.join(['%s'] * len(ids))
+        query = f"SELECT student_id, username FROM student WHERE student_id IN ({placeholders})"
 
+        cursor.execute(query, tuple(ids))
+        rows = cursor.fetchall()
+
+        # 4. Montar a resposta igual ao formato original
+        usernames = []
+        ids_with_usernames = []
+
+        for row in rows:
+            # row[0] = student_id, row[1] = username
+            s_id = row[0]
+            s_username = row[1]
+
+            usernames.append(s_username)
+            ids_with_usernames.append({
+                "username": s_username, 
+                "id": s_id, 
+                'type': 'estudante'
+            })
+
+        result = {
+            "usernames": usernames,
+            "ids_with_usernames": ids_with_usernames if ids_with_usernames else [{"username": '', "id": '', 'type': 'estudante'}]
+        }
+
+        # Fechar recursos antes do return
+        cursor.close()
+        conn.close()
+        
         return jsonify(result), 200
-    
+
     except ValueError:
-        result = { "usernames": [],
-               "ids_with_usernames": [{"username": '', "id": '', 'type': 'estudante'}] }
+        # Caso a conversão map(int, ids) falhe
+        if conn: conn.close()
+        result = { "usernames": [], "ids_with_usernames": [{"username": '', "id": '', 'type': 'estudante'}] }
         return jsonify(result), 200
 
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({"error": str(e)}), 400
 
+# @student_bp.route('/students/ids_to_usernames', methods=['GET'])
+# def ids_to_names():
+#     ids = request.args.getlist('ids')
+
+#     try:
+#         # converte todos os ids para inteiros
+#         ids = list(map(int, ids))
+#         students = Student.query.filter(Student.id.in_(ids)).all()
+
+#         result = { "usernames": [student.username for student in students],
+#                 "ids_with_usernames": [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students] }
+
+#         return jsonify(result), 200
+    
+#     except ValueError:
+#         result = { "usernames": [],
+#                "ids_with_usernames": [{"username": '', "id": '', 'type': 'estudante'}] }
+#         return jsonify(result), 200
 
 @student_bp.route('/students/all_students_usernames', methods=['GET'])
 def all_students_usernames():
-    students = Student.query.all()
+    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
     
-    # if not students:
-    #     return jsonify({"error": "No students found"}), 404
+    cursor = conn.cursor()
 
-    usernames = [student.username for student in students]
-    # ids_with_usernames = [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students]
+    try:
+        query = "SELECT username FROM student;"
+        cursor.execute(query)
+        rows = cursor.fetchall()
 
-    return jsonify({"usernames": usernames}), 200
+        # rows vem como lista de tuplas: [('user1',), ('user2',)]
+        # Precisamos achatar para: ['user1', 'user2']
+        # usernames = [row[0] for row in rows]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"usernames": rows}), 200
+
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({"error": str(e)}), 400
+
+# @student_bp.route('/students/all_students_usernames', methods=['GET'])
+# def all_students_usernames():
+#     students = Student.query.all()
+    
+#     # if not students:
+#     #     return jsonify({"error": "No students found"}), 404
+
+#     usernames = [student.username for student in students]
+#     # ids_with_usernames = [{"username": student.username, "id": student.id, 'type': 'estudante'} for student in students]
+
+#     return jsonify({"usernames": usernames}), 200

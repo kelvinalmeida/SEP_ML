@@ -31,6 +31,21 @@ services:
       - FLASK_APP=app.py
       - PYTHONUNBUFFERED=1
     command: "flask run --host=0.0.0.0"
+  
+  user-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: postgres
+      LC_COLLATE: C.UTF-8
+      LC_CTYPE: C.UTF-8
+    volumes:
+      - db_data_user:/var/lib/postgresql/18/data
+      # - ./backup.sql:/docker-entrypoint-initdb.d/backup.sql
+    # You might want to map this to a different port to inspect it
+    ports:
+      - "5433:5432"
 
   user:
     build: ./user/
@@ -45,7 +60,10 @@ services:
       - FLASK_DEBUG=1
       - FLASK_APP=app.py
       - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:secret@user-db:5432/postgres
     command: "flask run --host=0.0.0.0"
+    depends_on:
+      - user-db
 
   strategies:
     build: ./strategies/
@@ -75,21 +93,6 @@ services:
       - FLASK_APP=app.py
       - PYTHONUNBUFFERED=1
     command: "flask run --host=0.0.0.0"
-  
-  user-db:
-    image: postgres
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: postgres
-      LC_COLLATE: C.UTF-8
-      LC_CTYPE: C.UTF-8
-    volumes:
-      - db_data_user:/var/lib/postgresql/18/data
-      # - ./backup.sql:/docker-entrypoint-initdb.d/backup.sql
-    # You might want to map this to a different port to inspect it
-    ports:
-      - "5433:5432"
 
   adminer:
     image: adminer
