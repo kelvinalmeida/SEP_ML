@@ -28,9 +28,10 @@ def create_students():
             # return f"{all_students_usernames} {all_teachers_usernames}"
             if username in all_students_usernames["usernames"] or username in all_teachers_usernames["usernames"]:
                 return render_template("./user/create_student.html", error="Username already exists")
-
+            
             response = requests.post(f"{USER_URL}/students/create", json=student)
-            if response.status_code == 200:
+
+            if response.status_code == 201:
                 # json_response = response.json()
                 # return jsonify(json_response), 200
                 return render_template("./user/success.html")
