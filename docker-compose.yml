@@ -42,7 +42,7 @@ services:
       LC_CTYPE: C.UTF-8
     volumes:
       - db_data_user:/var/lib/postgresql/18/data
-      # - ./backup.sql:/docker-entrypoint-initdb.d/backup.sql
+      - ./user-db.sql:/docker-entrypoint-initdb.d/user-db.sql
     # You might want to map this to a different port to inspect it
     ports:
       - "5433:5432"
@@ -74,7 +74,7 @@ services:
       LC_COLLATE: C.UTF-8
       LC_CTYPE: C.UTF-8
     volumes:
-      - db_data_user:/var/lib/postgresql/18/data
+      - db_data_strategies:/var/lib/postgresql/18/data
       # - ./backup.sql:/docker-entrypoint-initdb.d/backup.sql
     # You might want to map this to a different port to inspect it
     ports:
@@ -111,7 +111,25 @@ services:
       - FLASK_DEBUG=1
       - FLASK_APP=app.py
       - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:secret@domain-db:5432/postgres
     command: "flask run --host=0.0.0.0"
+    depends_on:
+      - domain-db
+
+  domain-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: postgres
+      LC_COLLATE: C.UTF-8
+      LC_CTYPE: C.UTF-8
+    volumes:
+      - db_data_domain:/var/lib/postgresql/18/data
+      # - ./backup.sql:/docker-entrypoint-initdb.d/backup.sql
+    # You might want to map this to a different port to inspect it
+    ports:
+      - "5437:5432"
 
   adminer:
     image: adminer
@@ -121,3 +139,5 @@ services:
 # Volumes nomeados (se precisar persistência em banco ou arquivos locais)
 volumes:
   db_data_user:
+  db_data_strategies:
+  db_data_domain:
