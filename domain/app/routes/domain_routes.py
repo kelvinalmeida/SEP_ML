@@ -2,15 +2,72 @@ import json
 import logging
 import sys
 import os
-from flask import request, redirect, url_for, render_template, send_file, Blueprint, jsonify, current_app
+from flask import request, redirect, url_for, render_template, send_file, Blueprint, jsonify, current_app, send_from_directory
 from werkzeug.utils import secure_filename
-from flask import send_from_directory
 from db import create_connection
 
 domain_bp = Blueprint('domain_bp', __name__)
 
-# Configuração da pasta de uploads (caso ainda não exista no app config)
-# UPLOAD_FOLDER será definido dentro da rota usando current_app
+def get_db_connection():
+    return create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+
+def fetch_domains_with_children(conn, domain_ids=None):
+    cursor = conn.cursor()
+
+    # 1. Fetch domains
+    if domain_ids is not None:
+        # If domain_ids is empty list, return empty list
+        if not domain_ids:
+            return []
+        # psycopg2 requires tuple
+        query = "SELECT * FROM domain WHERE id IN %s"
+        cursor.execute(query, (tuple(domain_ids),))
+    else:
+        cursor.execute("SELECT * FROM domain")
+
+    domains = cursor.fetchall()
+    if not domains:
+        return []
+
+    # Create a dict for easy access
+    domain_map = {d['id']: d for d in domains}
+    # Initialize children lists
+    for d in domain_map.values():
+        d['pdfs'] = []
+        d['exercises'] = []
+        d['videos_uploaded'] = []
+        d['videos_youtube'] = []
+
+    domain_ids_tuple = tuple(domain_map.keys())
+
+    # 2. Fetch children
+    # PDF
+    cursor.execute("SELECT * FROM pdf WHERE domain_id IN %s", (domain_ids_tuple,))
+    pdfs = cursor.fetchall()
+    for pdf in pdfs:
+        domain_map[pdf['domain_id']]['pdfs'].append(pdf)
+
+    # Exercise
+    cursor.execute("SELECT * FROM exercise WHERE domain_id IN %s", (domain_ids_tuple,))
+    exercises = cursor.fetchall()
+    for ex in exercises:
+        if isinstance(ex['options'], str):
+             ex['options'] = json.loads(ex['options'])
+        domain_map[ex['domain_id']]['exercises'].append(ex)
+
+    # VideoUpload
+    cursor.execute("SELECT * FROM video_upload WHERE domain_id IN %s", (domain_ids_tuple,))
+    vus = cursor.fetchall()
+    for vu in vus:
+        domain_map[vu['domain_id']]['videos_uploaded'].append(vu)
+
+    # VideoYoutube
+    cursor.execute("SELECT * FROM video_youtube WHERE domain_id IN %s", (domain_ids_tuple,))
+    vys = cursor.fetchall()
+    for vy in vys:
+        domain_map[vy['domain_id']]['videos_youtube'].append(vy)
+
+    return list(domain_map.values())
 
 @domain_bp.route('/domains/create', methods=['POST'])
 def create_domain():
@@ -20,7 +77,7 @@ def create_domain():
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
     # Conexão com o banco
-    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
+    conn = get_db_connection()
     if conn is None:
         return jsonify({"error": "Database connection failed"}), 503
     
@@ -122,166 +179,263 @@ def create_domain():
         return jsonify({"message": "Erro ao processar exercícios", "error": str(e)}), 400
 
 
+@domain_bp.route('/domains', methods=['GET'])
+def list_domains():
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    try:
+        domains = fetch_domains_with_children(conn)
+        return jsonify(domains), 200
+    finally:
+        conn.close()
 
-# @domain_bp.route('/domains', methods=['GET'])
-# def list_domains():
-#     domains = Domain.query.all()
-#     domains_json = [domain.to_dict() for domain in domains]
-#     return domains_json, 200
+@domain_bp.route('/domains/delete/<int:domain_id>', methods=['DELETE'])
+def delete_domain(domain_id):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
+    try:
+        # Check if domain exists
+        cursor.execute("SELECT id FROM domain WHERE id = %s", (domain_id,))
+        if not cursor.fetchone():
+            return jsonify({"error": "Domain not found"}), 404
 
-# @domain_bp.route('/domains/delete/<int:domain_id>', methods=['DELETE'])
-# def delete_domain(domain_id):
-#     domain = Domain.query.get_or_404(domain_id)
-    
-#     # Delete associated PDFs
-#     for pdf in domain.pdfs:
-#         if os.path.exists(pdf.path):
-#             os.remove(pdf.path)
-#         db.session.delete(pdf)
+        # Delete associated files
+        # PDFs
+        cursor.execute("SELECT path FROM pdf WHERE domain_id = %s", (domain_id,))
+        for row in cursor.fetchall():
+            if os.path.exists(row['path']):
+                try:
+                    os.remove(row['path'])
+                except OSError:
+                    pass # Ignore if file already gone
 
-#     # Delete associated videos
-#     for video in domain.videos_uploaded:
-#         if os.path.exists(video.path):
-#             os.remove(video.path)
-#         db.session.delete(video)
-#     for video in domain.videos_youtube:
-#         db.session.delete(video)    
-#     # Delete associated exercises
-#     for exercise in domain.exercises:
-#         db.session.delete(exercise)
+        # Videos Uploaded
+        cursor.execute("SELECT path FROM video_upload WHERE domain_id = %s", (domain_id,))
+        for row in cursor.fetchall():
+            if os.path.exists(row['path']):
+                try:
+                    os.remove(row['path'])
+                except OSError:
+                    pass
 
-#     db.session.delete(domain)
-#     db.session.commit()
-    
-#     return jsonify({"message": "Domain deleted successfully!"}), 200
+        # Delete domain (CASCADE will handle DB records for children)
+        cursor.execute("DELETE FROM domain WHERE id = %s", (domain_id,))
+        conn.commit()
+        return jsonify({"message": "Domain deleted successfully!"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+@domain_bp.route('/domains/<int:domain_id>', methods=['GET'])
+def get_domain(domain_id):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    try:
+        domains = fetch_domains_with_children(conn, [domain_id])
+        if not domains:
+            return jsonify({"error": "Domain not found"}), 404
+        return jsonify(domains[0]), 200
+    finally:
+        conn.close()
 
 
-# @domain_bp.route('/domains/<int:domain_id>', methods=['GET'])
-# def get_domain(domain_id):
-#     domain = Domain.query.get_or_404(domain_id)
-#     return jsonify(domain.to_dict()), 200
+@domain_bp.route('/pdfs', methods=['GET'])
+def list_pdfs():
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM pdf")
+        pdfs = cursor.fetchall()
+        return jsonify(pdfs), 200
+    finally:
+        cursor.close()
+        conn.close()
 
 
-# @domain_bp.route('/pdfs', methods=['GET'])
-# def list_pdfs():
-#     pdfs = PDF.query.all()
-#     pdfs_json = [pdf.to_dict() for pdf in pdfs]
-#     return jsonify(pdfs_json), 200
-
-
-# @domain_bp.route('/pdfs/<int:pdf_id>', methods=['GET'])
-# def download_pdf(pdf_id):
-#     # return "oi"
-#     try:
-#         pdf = PDF.query.get_or_404(pdf_id)
+@domain_bp.route('/pdfs/<int:pdf_id>', methods=['GET'])
+def download_pdf(pdf_id):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT path FROM pdf WHERE id = %s", (pdf_id,))
+        pdf = cursor.fetchone()
+        if not pdf:
+            return jsonify({'error': 'File not found'}), 404
         
-#         # Usa caminho absoluto
-#         file_path = os.path.abspath(pdf.path)
-#         # return f"{file_path}"
-#         if not os.path.exists(file_path):
-#             return jsonify({'error': 'File not found'}), 404
+        file_path = os.path.abspath(pdf['path'])
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
 
-#         return send_file(file_path, as_attachment=True)
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
 
-# @domain_bp.route('/domains/ids_to_names', methods=['GET'])
-# def ids_to_names():
-#     ids = request.args.getlist('ids')
+@domain_bp.route('/domains/ids_to_names', methods=['GET'])
+def ids_to_names():
+    ids = request.args.getlist('ids')
+    if not ids:
+        return jsonify([]), 200
+    try:
+        ids = list(map(int, ids))
+    except ValueError:
+        return jsonify({"error": "IDs must be integers"}), 400
     
-#     if not ids:
-#         return jsonify([]), 200
-
-#     try:
-#         # converte todos os ids para inteiros
-#         ids = list(map(int, ids))
-#     except ValueError:
-#         return jsonify({"error": "IDs must be integers"}), 400
-
-#     domains = Domain.query.filter(Domain.id.in_(ids)).all()
-
-#     if not domains:
-#         return jsonify({"error": "No domains found"}), 404
-
-#     result = [ 
-#         domain.to_dict()
-#         for domain in domains ]
-
-#     return jsonify(result), 200
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    try:
+        domains = fetch_domains_with_children(conn, ids)
+        if not domains:
+            # Original behavior returned [] if not found?
+            # Original code checked "if not domains: 404"
+            return jsonify({"error": "No domains found"}), 404
+        return jsonify(domains), 200
+    finally:
+        conn.close()
 
 
-# @domain_bp.route('/domains/<int:domain_id>/exercises', methods=['GET'])
-# def get_domain_exercises(domain_id):
-#     domain = Domain.query.get_or_404(domain_id)
-#     return jsonify([exercise.to_dict() for exercise in domain.exercises]), 200
+@domain_bp.route('/domains/<int:domain_id>/exercises', methods=['GET'])
+def get_domain_exercises(domain_id):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
+    try:
+        # Verify domain exists
+        cursor.execute("SELECT id FROM domain WHERE id = %s", (domain_id,))
+        if not cursor.fetchone():
+             return jsonify({"error": "Domain not found"}), 404
+
+        cursor.execute("SELECT * FROM exercise WHERE domain_id = %s", (domain_id,))
+        exercises = cursor.fetchall()
+        for ex in exercises:
+            if isinstance(ex['options'], str):
+                ex['options'] = json.loads(ex['options'])
+        return jsonify(exercises), 200
+    finally:
+        cursor.close()
+        conn.close()
 
 
+@domain_bp.route('/domains/<int:domain_id>/videos', methods=['GET'])
+def get_domain_videos(domain_id):
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
+    try:
+        # Verify domain exists
+        cursor.execute("SELECT id FROM domain WHERE id = %s", (domain_id,))
+        if not cursor.fetchone():
+             return jsonify({"error": "Domain not found"}), 404
 
-# @domain_bp.route('/domains/<int:domain_id>/videos', methods=['GET'])
-# def get_domain_videos(domain_id):
-#     domain = Domain.query.get_or_404(domain_id)
-#     return jsonify({
-#         "videos_uploaded": [video.to_dict() for video in domain.videos_uploaded],
-#         "videos_youtube": [video.to_dict() for video in domain.videos_youtube],
-#     }), 200
+        cursor.execute("SELECT * FROM video_upload WHERE domain_id = %s", (domain_id,))
+        videos_uploaded = cursor.fetchall()
+
+        cursor.execute("SELECT * FROM video_youtube WHERE domain_id = %s", (domain_id,))
+        videos_youtube = cursor.fetchall()
+
+        return jsonify({
+            "videos_uploaded": videos_uploaded,
+            "videos_youtube": videos_youtube,
+        }), 200
+    finally:
+        cursor.close()
+        conn.close()
 
 
-# @domain_bp.route('/video/uploaded/<int:video_id>', methods=['GET'])
-# def get_uploaded_video(video_id):
-
-#     UPLOAD_FOLDER = os.path.join(current_app.root_path, 'uploads')
-
-#     video = VideoUpload.query.get_or_404(video_id)
+@domain_bp.route('/video/uploaded/<int:video_id>', methods=['GET'])
+def get_uploaded_video(video_id):
+    UPLOAD_FOLDER = os.path.join(current_app.root_path, 'uploads')
     
-#     filename = video.filename  # supondo que sua classe VideoUpload tenha um campo `filename`
-#     filepath = os.path.join(UPLOAD_FOLDER, filename)
-    
-#     if not os.path.exists(filepath):
-#         return jsonify({'error': 'File not found on server'}), 404
-    
-#     return send_from_directory(UPLOAD_FOLDER, filename)
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT filename FROM video_upload WHERE id = %s", (video_id,))
+        video = cursor.fetchone()
+
+        if not video:
+             return jsonify({'error': 'Video not found'}), 404
+
+        filename = video['filename']
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+        if not os.path.exists(filepath):
+            return jsonify({'error': 'File not found on server'}), 404
+
+        return send_from_directory(UPLOAD_FOLDER, filename)
+    finally:
+        cursor.close()
+        conn.close()
 
 
-# @domain_bp.route('/exerc/testscores', methods=['POST'])
-# def get_test_scores():
-#     request_data = request.json
+@domain_bp.route('/exerc/testscores', methods=['POST'])
+def get_test_scores():
+    request_data = request.json
+    logging.basicConfig(level=logging.INFO)
+    logging.info("🔍 Dados recebidos domain: %s", request_data)
+    sys.stdout.flush()
 
-#     logging.basicConfig(level=logging.INFO)
-#     logging.info("🔍 Dados recebidos domain: %s", request_data)
-#     sys.stdout.flush()
+    student_name = request_data.get('student_name')
+    student_id = request_data.get('student_id')
+    answers = request_data.get('answers') # Array of {exercise_id, answer}
 
-#     student_name = request_data.get('student_name')
-#     student_id = request_data.get('student_id')
-#     answers = request_data.get('answers') # Array de respostas do aluno
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Database connection failed"}), 503
+    cursor = conn.cursor()
 
-#     score = 0;
+    try:
+        score = 0
+        if answers:
+            for answer in answers:
+                cursor.execute("SELECT correct FROM exercise WHERE id = %s", (answer['exercise_id'],))
+                exercise = cursor.fetchone()
 
-#     for answer in answers:
-#         exercise = Exercise.query.get_or_404(answer['exercise_id'])
+                if not exercise:
+                    answer['correct'] = False
+                    continue
 
-#         # logging.basicConfig(level=logging.INFO)
-#         # print("answer['answer'] == exercise.correct", answer['answer'], exercise.correct)
-#         # print("answer['answer'] == exercise.correct", int(answer['answer']) == int(exercise.correct))
-#         # sys.stdout.flush()
+                # Assuming 'correct' is stored as string in DB, and answer is string or int.
+                try:
+                    is_correct = int(answer['answer']) == int(exercise['correct'])
+                except (ValueError, TypeError):
+                    is_correct = str(answer['answer']) == str(exercise['correct'])
 
-#         if int(answer['answer']) == int(exercise.correct):
-#             answer['correct'] = True
-#             score += 1
-#         else:
-#             answer['correct'] = False
+                if is_correct:
+                    answer['correct'] = True
+                    score += 1
+                else:
+                    answer['correct'] = False
 
-    
-#     playload = {
-#         "student_name": student_name,
-#         "student_id": student_id,
-#         "answers": answers,
-#         "score": score,
-#     }
+        payload = {
+            "student_name": student_name,
+            "student_id": student_id,
+            "answers": answers,
+            "score": score,
+        }
 
+        logging.info("🔍 Respostas verificadas: %s", payload)
+        sys.stdout.flush()
 
-#     logging.basicConfig(level=logging.INFO)
-#     logging.info("🔍 Respostas verificadas: %s", playload)
-#     sys.stdout.flush()
+        return jsonify(payload), 200
 
-
-#     return jsonify(playload), 200
+    finally:
+        cursor.close()
+        conn.close()
