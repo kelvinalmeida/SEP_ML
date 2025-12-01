@@ -3,14 +3,38 @@ import sys
 import json
 import random
 import string
-from flask import Blueprint, request, jsonify
+import os
+from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
-from app.db_client import get_db_connection
+from contextlib import contextmanager
+
+# Assuming db.py is available in the python path (root of the service)
+try:
+    from db import create_connection
+except ImportError:
+    # If running from a different context where db is not top-level
+    # This might need adjustment based on how the app is launched.
+    # But based on user request "use db.py in control folder", and domain example.
+    # We will try a relative import if this fails or assume it works.
+    from ...db import create_connection
 
 session_bp = Blueprint('session_bp', __name__)
 
 def generate_unique_code(length=8):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+# Wrapper to use create_connection in a context manager style or just helper
+@contextmanager
+def get_db_connection():
+    # create_connection takes db_url
+    db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+    conn = create_connection(db_url)
+    if conn is None:
+        raise Exception("Failed to connect to database")
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 def get_session_details(conn, session_id):
     with conn.cursor() as cur:
@@ -56,15 +80,6 @@ def create_session():
                 if not cur.fetchone():
                     break
 
-            # Insert session
-            # Note: Postgres JSONB handles lists as JSON arrays.
-            # We convert python lists to json strings/objects.
-            # Psycopg2 adapts lists to arrays or json automatically depending on setup,
-            # but explicit json.dumps is safer for JSONB columns if adapter isn't set.
-            # However, with psycopg2.extras.Json or just passing the string.
-            # Let's try passing the list directly and rely on psycopg2 or use json.dumps.
-            # Using json.dumps ensures it goes in as JSON.
-
             cur.execute("""
                 INSERT INTO session (status, strategies, teachers, students, domains, code)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -87,9 +102,6 @@ def list_sessions():
             cur.execute("SELECT id FROM session")
             rows = cur.fetchall()
 
-            # This is N+1 but mimics previous behavior of calling to_dict() on all sessions
-            # which fetched relations.
-            # Optimization: could fetch all and join in memory, but sticking to logic.
             all_sessions = []
             for row in rows:
                 details = get_session_details(conn, row['id'])
@@ -117,7 +129,6 @@ def delete_session(session_id):
             if not cur.fetchone():
                 return jsonify({"error": "Session not found"}), 404
 
-            # Cascading delete is handled by DB FKs (ON DELETE CASCADE)
             cur.execute("DELETE FROM session WHERE id = %s", (session_id,))
             conn.commit()
 
@@ -270,13 +281,12 @@ def enter_session():
                 return jsonify({"error": "Session not found"}), 404
 
             session_id = session['id']
-            # Postgres returns JSONB as list/dict if using RealDictCursor and appropriate driver setting,
-            # or we might need to load it.
-            # Psycopg2 with RealDictCursor usually returns the python object for JSON types.
+
+            # Postgres returns JSONB as python objects with RealDictCursor
             students = session['students']
             teachers = session['teachers']
 
-            # Ensure they are lists (in case they are None or string?)
+            # Ensure they are lists
             if isinstance(students, str):
                 students = json.loads(students)
             if isinstance(teachers, str):
