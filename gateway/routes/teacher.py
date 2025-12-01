@@ -25,6 +25,9 @@ def create_teacher():
             students_response = requests.get(f"{USER_URL}/students/all_students_usernames")
             teachers_response = requests.get(f"{USER_URL}/teachers/all_teachers_usernames")
 
+            # return jsonify({"students_status": students_response.json(),
+            #     "teachers_status": teachers_response.json()}), 200
+
             # Verifique se deu certo
             if students_response.status_code != 200 or teachers_response.status_code != 200:
                 return jsonify({
@@ -41,6 +44,9 @@ def create_teacher():
             # Verifique se as chaves existem
             students_usernames = all_students_usernames.get("usernames", [])
             teachers_usernames = all_teachers_usernames.get("usernames", [])
+
+            # return jsonify({"students_usernames": students_usernames,
+            #     "teachers_usernames": teachers_usernames, 'username': username}), 200
 
             if username in students_usernames or username in teachers_usernames:
                 return render_template("./user/create_teacher.html", error="Username already exists")

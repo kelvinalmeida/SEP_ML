@@ -30,7 +30,25 @@ services:
       - FLASK_DEBUG=1
       - FLASK_APP=app.py
       - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:secret@controller-db:5432/postgres
     command: "flask run --host=0.0.0.0"
+    depends_on:
+      - controller-db
+  
+  controller-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: postgres
+      LC_COLLATE: C.UTF-8
+      LC_CTYPE: C.UTF-8
+    volumes:
+      - db_data_controller:/var/lib/postgresql/18/data
+      - ./control/controller-db.sql:/docker-entrypoint-initdb.d/controller-db.sql
+    # You might want to map this to a different port to inspect it
+    ports:
+      - "5439:5432"
   
   user-db:
     image: postgres
@@ -42,7 +60,7 @@ services:
       LC_CTYPE: C.UTF-8
     volumes:
       - db_data_user:/var/lib/postgresql/18/data
-      # - ./backup.sql:/docker-entrypoint-initdb.d/backup.sql
+      - ./user/user-db.sql:/docker-entrypoint-initdb.d/user-db.sql
     # You might want to map this to a different port to inspect it
     ports:
       - "5433:5432"
@@ -65,6 +83,21 @@ services:
     depends_on:
       - user-db
 
+  strategies-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: postgres
+      LC_COLLATE: C.UTF-8
+      LC_CTYPE: C.UTF-8
+    volumes:
+      - db_data_strategies:/var/lib/postgresql/18/data
+      - ./strategies/strategies-db.sql:/docker-entrypoint-initdb.d/strategies-db.sql
+    # You might want to map this to a different port to inspect it
+    ports:
+      - "5436:5432"
+
   strategies:
     build: ./strategies/
     container_name: strategies_container
@@ -78,7 +111,11 @@ services:
       - FLASK_DEBUG=1
       - FLASK_APP=app.py
       - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:secret@strategies-db:5432/postgres
     command: "flask run --host=0.0.0.0"
+    depends_on:
+      - strategies-db
+
   domain:
     build: ./domain/
     container_name: domain_container
@@ -92,7 +129,25 @@ services:
       - FLASK_DEBUG=1
       - FLASK_APP=app.py
       - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:secret@domain-db:5432/postgres
     command: "flask run --host=0.0.0.0"
+    depends_on:
+      - domain-db
+
+  domain-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: postgres
+      LC_COLLATE: C.UTF-8
+      LC_CTYPE: C.UTF-8
+    volumes:
+      - db_data_domain:/var/lib/postgresql/18/data
+      - ./domain/domain-db.sql:/docker-entrypoint-initdb.d/domain-db.sql
+    # You might want to map this to a different port to inspect it
+    ports:
+      - "5437:5432"
 
   adminer:
     image: adminer
@@ -102,3 +157,6 @@ services:
 # Volumes nomeados (se precisar persistência em banco ou arquivos locais)
 volumes:
   db_data_user:
+  db_data_strategies:
+  db_data_domain:
+  db_data_controller:

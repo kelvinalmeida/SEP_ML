@@ -199,7 +199,6 @@ def ids_to_names():
     # 1. Pegar os IDs da URL
     ids = request.args.getlist('ids')
     
-    # Se não houver IDs, retorna estrutura vazia imediatamente
     if not ids:
         result = { 
             "usernames": [],
@@ -214,25 +213,24 @@ def ids_to_names():
     cursor = conn.cursor()
 
     try:
-        # 2. Converter para inteiros para segurança e sanitização
         ids = list(map(int, ids))
 
-        # 3. Criar placeholders dinamicamente para o SQL (ex: "%s, %s, %s")
-        # Isso previne SQL Injection e permite passar uma lista de tamanho variável
         placeholders = ', '.join(['%s'] * len(ids))
+        
+        # O Select pede 'student_id' e 'username'
         query = f"SELECT student_id, username FROM student WHERE student_id IN ({placeholders})"
 
         cursor.execute(query, tuple(ids))
         rows = cursor.fetchall()
 
-        # 4. Montar a resposta igual ao formato original
         usernames = []
         ids_with_usernames = []
 
         for row in rows:
-            # row[0] = student_id, row[1] = username
-            s_id = row[0]
-            s_username = row[1]
+            # CORREÇÃO AQUI: Acessar pelo NOME da coluna (chave do dicionário)
+            # row é algo como: {'student_id': 4, 'username': 'maria'}
+            s_id = row['student_id']
+            s_username = row['username']
 
             usernames.append(s_username)
             ids_with_usernames.append({
@@ -246,11 +244,16 @@ def ids_to_names():
             "ids_with_usernames": ids_with_usernames if ids_with_usernames else [{"username": '', "id": '', 'type': 'estudante'}]
         }
 
-        # Fechar recursos antes do return
         cursor.close()
         conn.close()
         
         return jsonify(result), 200
+
+    except Exception as e:
+        if conn:
+            conn.close()
+        # Dica: print(e) no terminal ajuda a ver o erro real (KeyError)
+        return jsonify({"error": str(e)}), 400
 
     except ValueError:
         # Caso a conversão map(int, ids) falhe
@@ -295,14 +298,12 @@ def all_students_usernames():
         cursor.execute(query)
         rows = cursor.fetchall()
 
-        # rows vem como lista de tuplas: [('user1',), ('user2',)]
-        # Precisamos achatar para: ['user1', 'user2']
-        # usernames = [row[0] for row in rows]
+        usernames = [row['username'] for row in rows]
 
         cursor.close()
         conn.close()
 
-        return jsonify({"usernames": rows}), 200
+        return jsonify({"usernames": usernames}), 200
 
     except Exception as e:
         if conn:

@@ -1,0 +1,22 @@
+ git rm -r --cached .
+
+=================================
+
+ docker-compose down -v
+ docker-compose up --build
+ docker-compose up
+
+=================================
+
+Desfazer o commit, mas manter as alterações prontas para commitar (Soft)
+Use esta opção se você fez um commit, mas esqueceu de adicionar um arquivo ou quer apenas mudar a mensagem e fazer o commit novamente com os mesmos arquivos.
+
+Bash
+
+git reset --soft HEAD~1
+
+O que acontece: O commit desaparece do histórico.
+
+Seus arquivos: As alterações continuam lá e já estão na Staging Area (verdes, prontas para um novo commit).
+
+=================================
