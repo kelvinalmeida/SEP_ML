@@ -7,21 +7,45 @@
 DROP TABLE IF EXISTS strategies CASCADE;
 DROP TABLE IF EXISTS message CASCADE;
 DROP TABLE IF EXISTS private_message CASCADE;
+DROP TABLE IF EXISTS tactics CASCADE;
+DROP TABLE IF EXISTS general_message CASCADE;
 
 -- 3. Create the Strategies table
 CREATE TABLE strategies (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    -- JSONB is the Postgres replacement for PickleType
-    -- We default it to an empty JSON array '[]'
-    tatics JSONB NOT NULL DEFAULT '[]'::jsonb
+    name VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE tactics (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    time FLOAT,
+    chat_id INTEGER, -- Pode ser nulo conforme seu JSON
+    strategy_id INTEGER NOT NULL, -- O relacionamento (Chave Estrangeira)
+    
+    CONSTRAINT fk_strategies
+      FOREIGN KEY(strategy_id) 
+      REFERENCES strategies(id)
+      ON DELETE CASCADE -- Se deletar a estratégia, deleta as táticas dela
 );
 
 -- 4. Create the Message table
 CREATE TABLE message (
+    id SERIAL PRIMARY KEY
+);
+
+CREATE TABLE general_message (
     id SERIAL PRIMARY KEY,
-    -- Stores the general messages list as JSON
-    messages JSONB NOT NULL DEFAULT '[]'::jsonb
+    username VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Bom ter horário da mensagem
+    message_id INTEGER NOT NULL, -- Chave estrangeira para a tabela pai (sala)
+    
+    CONSTRAINT fk_message_room
+      FOREIGN KEY(message_id) 
+      REFERENCES message(id)
+      ON DELETE CASCADE
 );
 
 -- 5. Create the PrivateMessage table
