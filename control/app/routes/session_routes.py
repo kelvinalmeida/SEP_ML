@@ -188,7 +188,7 @@ def end_session(session_id):
 @session_bp.route('/sessions/submit_answer', methods=['POST'])
 def submit_answer():
     data = request.get_json()
-    student_id = data['student_id']
+    student_id = str(data['student_id'])
     session_id = data['session_id']
     
     with get_db_connection() as conn:
