@@ -1,25 +1,63 @@
 -- Limpa tabelas antigas se existirem (para recriação limpa)
 DROP TABLE IF EXISTS verified_answers CASCADE;
 DROP TABLE IF EXISTS extra_notes CASCADE;
+DROP TABLE IF EXISTS session_strategies CASCADE;
+DROP TABLE IF EXISTS session_teachers CASCADE;
+DROP TABLE IF EXISTS session_students CASCADE;
+DROP TABLE IF EXISTS session_domains CASCADE;
 DROP TABLE IF EXISTS session CASCADE;
 
 -- 1. Tabela Session (Tabela Pai)
 CREATE TABLE session (
     id SERIAL PRIMARY KEY,
     status VARCHAR(50) NOT NULL,
-    
-    -- Colunas que eram PickleType viram JSONB.
-    -- O padrão '[]'::jsonb garante que comece com uma lista vazia, igual ao default=list do Python.
-    strategies JSONB NOT NULL DEFAULT '[]'::jsonb,
-    teachers JSONB NOT NULL DEFAULT '[]'::jsonb,
-    students JSONB NOT NULL DEFAULT '[]'::jsonb,
-    domains JSONB NOT NULL DEFAULT '[]'::jsonb,
-    
     code VARCHAR(50) NOT NULL UNIQUE,
     start_time TIMESTAMP
 );
 
--- 2. Tabela ExtraNotes
+-- 2. Tabelas normalizadas (Relacionamentos)
+
+CREATE TABLE session_strategies (
+    session_id INTEGER NOT NULL,
+    strategy_id VARCHAR(50) NOT NULL,
+    PRIMARY KEY (session_id, strategy_id),
+    CONSTRAINT fk_session_strategies
+        FOREIGN KEY (session_id)
+        REFERENCES session (id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE session_teachers (
+    session_id INTEGER NOT NULL,
+    teacher_id VARCHAR(50) NOT NULL,
+    PRIMARY KEY (session_id, teacher_id),
+    CONSTRAINT fk_session_teachers
+        FOREIGN KEY (session_id)
+        REFERENCES session (id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE session_students (
+    session_id INTEGER NOT NULL,
+    student_id VARCHAR(50) NOT NULL,
+    PRIMARY KEY (session_id, student_id),
+    CONSTRAINT fk_session_students
+        FOREIGN KEY (session_id)
+        REFERENCES session (id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE session_domains (
+    session_id INTEGER NOT NULL,
+    domain_id VARCHAR(50) NOT NULL,
+    PRIMARY KEY (session_id, domain_id),
+    CONSTRAINT fk_session_domains
+        FOREIGN KEY (session_id)
+        REFERENCES session (id)
+        ON DELETE CASCADE
+);
+
+-- 3. Tabela ExtraNotes
 CREATE TABLE extra_notes (
     id SERIAL PRIMARY KEY,
     estudante_username VARCHAR(100) NOT NULL,
@@ -33,11 +71,11 @@ CREATE TABLE extra_notes (
         ON DELETE CASCADE
 );
 
--- 3. Tabela VerifiedAnswers
+-- 4. Tabela VerifiedAnswers
 CREATE TABLE verified_answers (
     id SERIAL PRIMARY KEY,
     student_name VARCHAR(100) NOT NULL,
-    -- Nota: No seu modelo Python, student_id aqui é String(50), diferente de ExtraNotes (Integer)
+    -- Nota: Mantendo VARCHAR(50) conforme original
     student_id VARCHAR(50) NOT NULL, 
     answers JSONB NOT NULL,
     score INTEGER NOT NULL DEFAULT 0,
