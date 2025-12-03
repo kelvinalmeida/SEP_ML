@@ -45,6 +45,19 @@ def get_session_details(conn, session_id):
         if not session:
             return None
 
+        # Get Related Lists
+        cur.execute("SELECT strategy_id FROM session_strategies WHERE session_id = %s", (session_id,))
+        strategies = [row['strategy_id'] for row in cur.fetchall()]
+
+        cur.execute("SELECT teacher_id FROM session_teachers WHERE session_id = %s", (session_id,))
+        teachers = [row['teacher_id'] for row in cur.fetchall()]
+
+        cur.execute("SELECT student_id FROM session_students WHERE session_id = %s", (session_id,))
+        students = [row['student_id'] for row in cur.fetchall()]
+
+        cur.execute("SELECT domain_id FROM session_domains WHERE session_id = %s", (session_id,))
+        domains = [row['domain_id'] for row in cur.fetchall()]
+
         # Get VerifiedAnswers
         cur.execute("SELECT * FROM verified_answers WHERE session_id = %s", (session_id,))
         verified_answers = cur.fetchall()
@@ -55,6 +68,10 @@ def get_session_details(conn, session_id):
 
         # Format the session dict to match the previous model.to_dict()
         session_dict = dict(session)
+        session_dict['strategies'] = strategies
+        session_dict['teachers'] = teachers
+        session_dict['students'] = students
+        session_dict['domains'] = domains
         session_dict['verified_answers'] = [dict(va) for va in verified_answers]
         session_dict['extra_notes'] = [dict(en) for en in extra_notes]
 
@@ -81,16 +98,29 @@ def create_session():
                     break
 
             cur.execute("""
-                INSERT INTO session (status, strategies, teachers, students, domains, code)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO session (status, code)
+                VALUES (%s, %s)
+                RETURNING id
             """, (
                 'aguardando',
-                json.dumps(strategies),
-                json.dumps(teachers),
-                json.dumps(students),
-                json.dumps(domains),
                 code
             ))
+            session_id = cur.fetchone()['id']
+
+            # Insert relations
+            if strategies:
+                cur.executemany("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
+                                [(session_id, str(s)) for s in strategies])
+            if teachers:
+                cur.executemany("INSERT INTO session_teachers (session_id, teacher_id) VALUES (%s, %s)",
+                                [(session_id, str(t)) for t in teachers])
+            if students:
+                cur.executemany("INSERT INTO session_students (session_id, student_id) VALUES (%s, %s)",
+                                [(session_id, str(s)) for s in students])
+            if domains:
+                cur.executemany("INSERT INTO session_domains (session_id, domain_id) VALUES (%s, %s)",
+                                [(session_id, str(d)) for d in domains])
+
             conn.commit()
 
     return jsonify({"success": "Session created!"}), 200
@@ -129,6 +159,7 @@ def delete_session(session_id):
             if not cur.fetchone():
                 return jsonify({"error": "Session not found"}), 404
 
+            # Cascading delete will handle related tables
             cur.execute("DELETE FROM session WHERE id = %s", (session_id,))
             conn.commit()
 
@@ -269,12 +300,12 @@ def enter_session():
     data = request.get_json()
 
     session_code = data.get('session_code')
-    requester_id = data.get('requester_id')
+    requester_id = str(data.get('requester_id')) # Ensure string for DB consistency
     user_type = data.get('type') # 'type' is a built-in function name
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, students, teachers FROM session WHERE code = %s", (session_code,))
+            cur.execute("SELECT id FROM session WHERE code = %s", (session_code,))
             session = cur.fetchone()
 
             if not session:
@@ -282,32 +313,16 @@ def enter_session():
 
             session_id = session['id']
 
-            # Postgres returns JSONB as python objects with RealDictCursor
-            students = session['students']
-            teachers = session['teachers']
-
-            # Ensure they are lists
-            if isinstance(students, str):
-                students = json.loads(students)
-            if isinstance(teachers, str):
-                teachers = json.loads(teachers)
-
-            if students is None: students = []
-            if teachers is None: teachers = []
-
-            updated = False
+            # Check if already enrolled to avoid duplicates or error
             if user_type == 'student':
-                if requester_id not in students:
-                    students.append(requester_id)
-                    updated = True
-                    cur.execute("UPDATE session SET students = %s WHERE id = %s", (json.dumps(students), session_id))
+                cur.execute("SELECT 1 FROM session_students WHERE session_id = %s AND student_id = %s", (session_id, requester_id))
+                if not cur.fetchone():
+                    cur.execute("INSERT INTO session_students (session_id, student_id) VALUES (%s, %s)", (session_id, requester_id))
+                    conn.commit()
             else:
-                if requester_id not in teachers:
-                    teachers.append(requester_id)
-                    updated = True
-                    cur.execute("UPDATE session SET teachers = %s WHERE id = %s", (json.dumps(teachers), session_id))
-
-            if updated:
-                conn.commit()
+                cur.execute("SELECT 1 FROM session_teachers WHERE session_id = %s AND teacher_id = %s", (session_id, requester_id))
+                if not cur.fetchone():
+                    cur.execute("INSERT INTO session_teachers (session_id, teacher_id) VALUES (%s, %s)", (session_id, requester_id))
+                    conn.commit()
 
     return jsonify({"success": "Entered session successfully"}), 200
