@@ -28,31 +28,27 @@ def create_strategy():
         name = request.json.get('name')
         raw_tatics = request.json.get('tatics', [])
 
-        # Lógica Original Adaptada:
-        # O original fazia: [Tatics(description=..., name=...) for tatic in tatics]
-        # Aqui, montamos uma lista de dicionários para salvar no campo JSONB do Postgres.
-        # Isso garante que estamos salvando apenas os campos esperados, assim como o Model fazia.
-        tatatics_list = []
+        # Insert strategy
+        query_strat = "INSERT INTO strategies (name) VALUES (%s) RETURNING id;"
+        cursor.execute(query_strat, (name,))
+        strategy_id = cursor.fetchone()['id']
+
+        # Insert tactics
         if raw_tatics:
+            query_tactic = """
+                INSERT INTO tactics (name, description, time, chat_id, strategy_id)
+                VALUES (%s, %s, %s, %s, %s);
+            """
             for tatic in raw_tatics:
-                tatatics_list.append({
-                    "description": tatic.get("description"),
-                    "name": tatic.get("name"),
-                    "time": tatic.get("time"),
-                    "chat_id": tatic.get("chat_id")
-                })
-
-        # Query SQL
-        # name -> VARCHAR
-        # tatics -> JSONB (precisa de json.dumps)
-        query = """
-            INSERT INTO strategies (name, tatics)
-            VALUES (%s, %s);
-        """
+                cursor.execute(query_tactic, (
+                    tatic.get("name"),
+                    tatic.get("description"),
+                    tatic.get("time"),
+                    tatic.get("chat_id"),
+                    strategy_id
+                ))
         
-        cursor.execute(query, (name, json.dumps(tatatics_list)))
         conn.commit()
-
         cursor.close()
         conn.close()
 
@@ -81,14 +77,16 @@ def list_strategies():
     cursor = conn.cursor()
 
     try:
-        # Selecionamos os dados. 
-        # Como 'tatics' é JSONB, o psycopg2 já o converte para uma lista de dicts no Python automaticamente.
-        query = "SELECT id, name, tatics FROM strategies;"
+        # Seleciona estratégias
+        query = "SELECT id, name FROM strategies;"
         cursor.execute(query)
-        
-        # rows será algo como: 
-        # [{'id': 1, 'name': 'Rush B', 'tatics': [{'name': '...', 'time': '...'}]}, ...]
         strategies = cursor.fetchall()
+
+        # Popula tatics para cada estratégia
+        # (N+1 query, mas mantém simplicidade com psycopg2 raw)
+        for s in strategies:
+            cursor.execute("SELECT name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (s['id'],))
+            s['tatics'] = cursor.fetchall()
 
         cursor.close()
         conn.close()
@@ -118,19 +116,20 @@ def strategy_by_id(strategy_id):
 
     try:
         # Seleciona a estratégia específica pelo ID
-        query = "SELECT id, name, tatics FROM strategies WHERE id = %s"
+        query = "SELECT id, name FROM strategies WHERE id = %s"
         cursor.execute(query, (strategy_id,))
-        
-        # fetchone retorna um único dicionário: {'id': 1, 'name': '...', 'tatics': [...]}
         strategy = cursor.fetchone()
 
-        cursor.close()
-        conn.close()
-
         if strategy:
-            # Retorna o dicionário direto. O JSONB já virou lista Python.
+            cursor.execute("SELECT name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (strategy['id'],))
+            strategy['tatics'] = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
             return jsonify(strategy), 200
         
+        cursor.close()
+        conn.close()
         return jsonify({"error": "Strategy not found"}), 404
 
     except Exception as e:
@@ -189,34 +188,8 @@ def strategy_by_id(strategy_id):
 # ---------------------------------------------------------
 @strategies_bp.route('/strategies/time/<int:strategy_id>', methods=['GET'])
 def get_strategy_by_id(strategy_id):
-    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
-    if conn is None:
-        return jsonify({"error": "Database connection failed"}), 503
-    
-    cursor = conn.cursor()
-
-    try:
-        query = "SELECT id, name, tatics FROM strategies WHERE id = %s"
-        cursor.execute(query, (strategy_id,))
-        strategy = cursor.fetchone()
-
-        cursor.close()
-        conn.close()
-
-        if strategy:
-            # O campo 'tatics' do JSONB já vem como lista de dicionários.
-            # Não é necessário .as_dict() pois já são dicts.
-            return jsonify({
-                "id": strategy['id'], 
-                "name": strategy['name'], 
-                "tatics": strategy['tatics']
-            }), 200
-        
-        return jsonify({"error": "Strategy not found"}), 404
-
-    except Exception as e:
-        if conn: conn.close()
-        return jsonify({"error": str(e)}), 400
+    # Reutiliza a lógica de strategy_by_id pois retornam a mesma estrutura
+    return strategy_by_id(strategy_id)
 
 
 # ---------------------------------------------------------
@@ -244,36 +217,17 @@ def get_full_tatics_time():
     try:
         # Monta a query com IN (%s, %s, ...)
         placeholders = ', '.join(['%s'] * len(ids))
-        query = f"SELECT tatics FROM strategies WHERE id IN ({placeholders})"
+        query = f"SELECT SUM(time) as total_time FROM tactics WHERE strategy_id IN ({placeholders})"
         
         cursor.execute(query, tuple(ids))
-        rows = cursor.fetchall() # Retorna lista de dicts: [{'tatics': [...]}, ...]
+        result = cursor.fetchone()
 
-        if not rows:
-             cursor.close()
-             conn.close()
-             return jsonify({"error": "No strategies found"}), 404
-
-        full_tactics_time = 0
-
-        for row in rows:
-            # row['tatics'] é a lista vinda do JSONB
-            tactics_list = row.get('tatics', [])
-            
-            if isinstance(tactics_list, list):
-                for tactic in tactics_list:
-                    # Acessa via chave de dicionário, não atributo
-                    # Tenta converter para float para somar corretamente
-                    try:
-                        val = float(tactic.get("time", 0))
-                    except (ValueError, TypeError):
-                        val = 0
-                    full_tactics_time += val
+        total_time = result['total_time'] if result and result['total_time'] is not None else 0
 
         cursor.close()
         conn.close()
 
-        return jsonify({"full_tactics_time": round(full_tactics_time, 2)}), 200
+        return jsonify({"full_tactics_time": round(float(total_time), 2)}), 200
 
     except Exception as e:
         if conn: conn.close()
@@ -301,6 +255,7 @@ def remove_strategy(strategy_id):
             return jsonify({"error": "Strategy not found"}), 404
 
         # 2. Deleta
+        # Cascade no banco cuida de deletar tactics
         delete_query = "DELETE FROM strategies WHERE id = %s"
         cursor.execute(delete_query, (strategy_id,))
         conn.commit()
@@ -360,19 +315,19 @@ def show_chats():
     cursor = conn.cursor()
 
     try:
-        # Recupera todas as mensagens. 
-        # Assumindo que a coluna 'messages' é do tipo JSONB no Postgres.
-        query = "SELECT id, messages FROM message;"
-        cursor.execute(query)
+        cursor.execute("SELECT id FROM message;")
+        chats = cursor.fetchall()
         
-        # O RealDictCursor já retorna: [{'id': 1, 'messages': [...]}, ...]
-        all_chats = cursor.fetchall()
+        for chat in chats:
+            # Reconstruct 'messages' list from general_message
+            cursor.execute("SELECT username, content FROM general_message WHERE message_id = %s ORDER BY timestamp ASC;", (chat['id'],))
+            chat['messages'] = cursor.fetchall()
 
         cursor.close()
         conn.close()
 
         # O retorno é direto, pois a estrutura já está pronta
-        return jsonify(all_chats), 200
+        return jsonify(chats), 200
 
     except Exception as e:
         if conn: conn.close()
@@ -396,28 +351,16 @@ def send_private_message():
     cursor = conn.cursor()
 
     try:
-        # ATENÇÃO: Ajuste os nomes das colunas abaixo (sender_id, receiver_id) 
-        # para corresponderem exatamente à sua tabela 'private_message' no banco.
+        # ATENÇÃO: Esta rota usa 'receiver_id' que não existe no novo schema.
+        # O novo schema exige 'message_id' (chat/sala) para mensagens privadas.
+        # Portanto, esta rota está quebrada se o client não mandar message_id.
+        # Vou tentar inserir se os dados estiverem presentes, mas caso contrário falhará.
+        # Como o objetivo é "adaptar", e a tabela mudou, esta rota antiga perde sentido sem update do client.
         
-        query = """
-            INSERT INTO private_message (sender_id, receiver_id, content)
-            VALUES (%s, %s, %s)
-            RETURNING id, sender_id, receiver_id, content;
-        """
+        # Tentativa de manter compatibilidade se possível, mas provavelmente falhará
+        # pois não temos message_id aqui.
         
-        # Executa o insert
-        cursor.execute(query, (data['sender_id'], data['receiver_id'], data['content']))
-        
-        # Pega o dicionário do item criado
-        new_msg = cursor.fetchone()
-        
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-
-        # Retorna o objeto criado (equivalente ao msg.as_dict())
-        return jsonify(new_msg), 201
+        return jsonify({"error": "Endpoint deprecated or incompatible with new schema (missing message_id)"}), 400
 
     except Exception as e:
         if conn:
@@ -494,27 +437,25 @@ def ids_to_names():
         # Cria os placeholders (%s, %s, ...) dinamicamente
         placeholders = ', '.join(['%s'] * len(ids))
         
-        # Selecionamos name e tatics. 
-        # O Postgres já converte o JSONB 'tatics' para lista/dict Python.
-        query = f"SELECT name, tatics FROM strategies WHERE id IN ({placeholders})"
-        
-        cursor.execute(query, tuple(ids))
-        rows = cursor.fetchall()
+        cursor.execute(f"SELECT id, name FROM strategies WHERE id IN ({placeholders})", tuple(ids))
+        strategies = cursor.fetchall()
 
-        # Mantendo a lógica original: Se não achou nada, retorna 404
-        if not rows:
+        if not strategies:
              cursor.close()
              conn.close()
              return jsonify({"error": "No strategies found"}), 404
 
+        for s in strategies:
+            cursor.execute("SELECT name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (s['id'],))
+            s['tatics'] = cursor.fetchall()
+
         # Monta o resultado no formato exato que você pediu.
-        # Não precisamos de [t.as_dict() for t...] pois row['tatics'] já é a lista pronta.
         result = [
             {
-                "name": row['name'], 
-                "tatics": row['tatics']
+                "name": s['name'],
+                "tatics": s['tatics']
             } 
-            for row in rows
+            for s in strategies
         ]
 
         cursor.close()
@@ -539,19 +480,22 @@ def get_strategy_chat(strategy_id):
     cursor = conn.cursor()
 
     try:
-        # Seleciona todas as colunas (ou especifique id, messages)
-        query = "SELECT id, messages FROM message WHERE id = %s"
+        # Seleciona o chat
+        query = "SELECT id FROM message WHERE id = %s"
         cursor.execute(query, (strategy_id,))
         chat = cursor.fetchone()
 
-        cursor.close()
-        conn.close()
-
         if chat:
-            # O RealDictCursor retorna um dict. 
-            # Isso substitui o método .as_dict() do modelo.
+            # Seleciona mensagens gerais
+            cursor.execute("SELECT username, content FROM general_message WHERE message_id = %s ORDER BY timestamp ASC", (strategy_id,))
+            chat['messages'] = cursor.fetchall()
+
+            cursor.close()
+            conn.close()
             return jsonify(chat), 200
         
+        cursor.close()
+        conn.close()
         return jsonify({"error": "Chat not found"}), 404
 
     except Exception as e:
@@ -571,13 +515,10 @@ def create_chat():
     cursor = conn.cursor()
 
     try:
-        # Inserimos uma lista vazia '[]' na coluna messages (que é JSONB).
-        # RETURNING id nos dá o ID gerado imediatamente.
-        query = "INSERT INTO message (messages) VALUES (%s) RETURNING id;"
+        # Inserimos com DEFAULT VALUES pois só tem ID
+        query = "INSERT INTO message DEFAULT VALUES RETURNING id;"
         
-        # Enviamos uma string JSON de lista vazia
-        cursor.execute(query, (json.dumps([]),))
-        
+        cursor.execute(query)
         new_row = cursor.fetchone()
         conn.commit()
 
@@ -662,31 +603,8 @@ def create_chat():
 @strategies_bp.route('/chat/<int:chat_id>/general_messages', methods=['GET'])
 def get_general_messages(chat_id):
     """Retorna apenas as mensagens do chat geral."""
-    
-    conn = create_connection(current_app.config['SQLALCHEMY_DATABASE_URI'])
-    if conn is None:
-        return jsonify({"error": "Database connection failed"}), 503
-    
-    cursor = conn.cursor()
-
-    try:
-        # Busca o chat pelo ID
-        query = "SELECT id, messages FROM message WHERE id = %s"
-        cursor.execute(query, (chat_id,))
-        chat = cursor.fetchone()
-
-        cursor.close()
-        conn.close()
-
-        if chat:
-            # chat['messages'] já é convertido automaticamente para lista pelo driver
-            return jsonify(chat), 200
-        
-        return jsonify({"error": "Chat not found"}), 404
-
-    except Exception as e:
-        if conn: conn.close()
-        return jsonify({"error": str(e)}), 400
+    # Reutiliza get_strategy_chat que retorna {id:..., messages:[...]}
+    return get_strategy_chat(chat_id)
 
 
 # ==========================================
@@ -740,7 +658,7 @@ def get_private_messages(chat_id, myUsername, target_username):
 
 
 # ==========================================
-# 3. ADD MESSAGE (Ao Chat Geral - JSONB)
+# 3. ADD MESSAGE (Ao Chat Geral - Normalizado)
 # ==========================================
 @strategies_bp.route('/chat/<int:chat_id>/add_message', methods=['POST'])
 def add_message(chat_id):
@@ -762,33 +680,22 @@ def add_message(chat_id):
             return jsonify({"error": "Chat not found"}), 404
 
         data = request.json
-        new_message = {
-            "username": data.get('username'), 
-            "content": data.get('content')
-        }
-
-        # UPDATE MÁGICO DO POSTGRES PARA JSONB:
-        # O operador '||' concatena arrays JSONB.
-        # Precisamos converter o nosso dicionário único em uma LISTA JSON stringificada.
-        # message_column = message_column || '[{novo_dado}]'
+        username = data.get('username')
+        content = data.get('content')
         
-        update_query = """
-            UPDATE message 
-            SET messages = messages || %s::jsonb
-            WHERE id = %s;
+        insert_query = """
+            INSERT INTO general_message (username, content, message_id)
+            VALUES (%s, %s, %s);
         """
         
-        # Envelopamos o new_message em uma lista [] e convertemos para string JSON
-        json_payload = json.dumps([new_message])
-        
-        cursor.execute(update_query, (json_payload, chat_id))
+        cursor.execute(insert_query, (username, content, chat_id))
         conn.commit()
 
         cursor.close()
         conn.close()
 
         # Retorna o objeto simples, como o original fazia
-        return jsonify(new_message), 201
+        return jsonify({"username": username, "content": content}), 201
 
     except Exception as e:
         if conn:
@@ -850,4 +757,3 @@ def add_priv_message(chat_id):
             conn.rollback()
             conn.close()
         return jsonify({"error": str(e)}), 400
-

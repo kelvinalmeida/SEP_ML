@@ -247,6 +247,9 @@ def submit_answer(current_user=None):
         if resp.status_code == 409:
             return jsonify({"resp": "As respostas já foram registradas para esse estudante!"}), 200
 
+        if resp.status_code not in [200, 201]:
+             return jsonify({"error": "Erro ao salvar resposta no controle", "details": resp.text}), resp.status_code
+
         # Por enquanto apenas retorna os dados recebidos
         return jsonify({"resp": "Respostas enviadas com sucesso!"}), 200
 
