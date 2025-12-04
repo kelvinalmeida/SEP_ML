@@ -2,25 +2,25 @@ DROP TABLE IF EXISTS student CASCADE;
 DROP TABLE IF EXISTS teacher CASCADE;
 
 CREATE TABLE student(
-student_id INT GENERATED ALWAYS AS IDENTITY,
-name VARCHAR(100),
-course VARCHAR(100),
-type VARCHAR(20),
-age SMALLINT,
-username VARCHAR(80),
-email VARCHAR(80),
-password_hash VARCHAR(128),
-PRIMARY KEY (student_id)
+    student_id INT GENERATED ALWAYS AS IDENTITY,
+    name VARCHAR(100),
+    course VARCHAR(100),
+    type VARCHAR(20),
+    age SMALLINT,
+    username VARCHAR(80),
+    email VARCHAR(80),
+    password_hash VARCHAR(128),
+    PRIMARY KEY (student_id)
 );
 
 CREATE TABLE teacher(
-teacher_id INT GENERATED ALWAYS AS IDENTITY,
-name VARCHAR(100),
-course VARCHAR(100),
-type VARCHAR(20),
-age SMALLINT,
-username VARCHAR(80),
-email VARCHAR(80),
-password_hash VARCHAR(128),
-PRIMARY KEY (teacher_id)
+    teacher_id INT GENERATED ALWAYS AS IDENTITY,
+    name VARCHAR(100),
+    course VARCHAR(100),
+    type VARCHAR(20),
+    age SMALLINT,
+    username VARCHAR(80),
+    email VARCHAR(80),
+    password_hash VARCHAR(128),
+    PRIMARY KEY (teacher_id)
 );

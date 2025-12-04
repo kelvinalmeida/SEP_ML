@@ -37,6 +37,6 @@ config.env
 .DS_Store
 Thumbs.db
 
-
+./uploads
 ./uploads//uploads/*
 !/uploads/.gitkeep
