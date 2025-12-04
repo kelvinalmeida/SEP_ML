@@ -592,6 +592,35 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 
+    // Adiciona listeners para os botões de avançar e retroceder
+    const prevBtn = document.getElementById("prevTacticBtn");
+    if(prevBtn){
+        prevBtn.addEventListener("click", () => {
+             fetch(`/sessions/${session_id}/prev_tactic`, { method: 'POST' })
+             .then(response => {
+                if(response.ok) {
+                    fetchCurrentTactic(session_id);
+                } else {
+                    console.error("Erro ao retroceder tática");
+                }
+             });
+        });
+    }
+
+    const nextBtn = document.getElementById("nextTacticBtn");
+    if(nextBtn){
+        nextBtn.addEventListener("click", () => {
+             fetch(`/sessions/${session_id}/next_tactic`, { method: 'POST' })
+             .then(response => {
+                 if(response.ok) {
+                    fetchCurrentTactic(session_id);
+                 } else {
+                     console.error("Erro ao avançar tática");
+                 }
+             });
+        });
+    }
+
     // Inicia o chat automaticamente se a sessão já estiver em andamento
     function iniciarChat() {
         let session_status = '';
@@ -604,10 +633,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (data.status === 'in-progress') {
                     // session_status = data.status;
                     fetchCurrentTactic(session_id);
-                    setInterval(() => fetchCurrentTactic(session_id), 15000);
+                    // setInterval(() => fetchCurrentTactic(session_id), 15000);
                 }
             })
     }
+
+    // Always poll
+    setInterval(() => fetchCurrentTactic(session_id), 5000);
 
     iniciarChat();
 
