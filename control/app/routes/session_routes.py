@@ -371,3 +371,42 @@ def enter_session():
                     conn.commit()
 
     return jsonify({"success": "Entered session successfully"}), 200
+
+@session_bp.route('/sessions/<int:session_id>/change_strategy', methods=['POST'])
+def change_session_strategy(session_id):
+    data = request.get_json()
+    new_strategy_id = data.get('strategy_id')
+
+    if not new_strategy_id:
+        return jsonify({"error": "Strategy ID is required"}), 400
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Session not found"}), 404
+
+            # Update strategy
+            # First remove existing strategies (assuming single strategy replacement based on request description)
+            # The schema allows multiple strategies (session_strategies table), but the prompt implies replacing "the" strategy.
+            # I will clear all existing strategies for this session and add the new one.
+            cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
+            cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)", (session_id, str(new_strategy_id)))
+
+            # Clear verified answers (full reset)
+            cur.execute("DELETE FROM verified_answers WHERE session_id = %s", (session_id,))
+
+            # Reset session state
+            start_time = datetime.utcnow()
+            cur.execute("""
+                UPDATE session
+                SET status = 'in-progress',
+                    start_time = %s,
+                    current_tactic_index = 0,
+                    current_tactic_started_at = %s
+                WHERE id = %s
+            """, (start_time, start_time, session_id))
+
+            conn.commit()
+
+    return jsonify({"success": "Strategy changed and session restarted!"}), 200

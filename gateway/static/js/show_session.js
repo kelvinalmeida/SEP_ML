@@ -621,6 +621,84 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Change Strategy Modal Logic
+    const changeStrategyBtn = document.getElementById("changeStrategyBtn");
+    const strategySelect = document.getElementById("strategySelect");
+    const strategyListLoader = document.getElementById("strategyListLoader");
+    const confirmChangeStrategyBtn = document.getElementById("confirmChangeStrategyBtn");
+
+    if (changeStrategyBtn) {
+        changeStrategyBtn.addEventListener("click", () => {
+            // Reset modal state
+            if (strategySelect) strategySelect.classList.add("d-none");
+            if (strategyListLoader) strategyListLoader.classList.remove("d-none");
+            if (strategySelect) strategySelect.innerHTML = '<option selected disabled>Select a strategy</option>';
+            if (confirmChangeStrategyBtn) confirmChangeStrategyBtn.disabled = true;
+
+            // Fetch strategies
+            fetch('/strategies/strategies_json')
+                 .then(response => {
+                     if(!response.ok) throw new Error("Failed to fetch strategies");
+                     return response.json();
+                 })
+                 .then(data => {
+                     data.forEach(strategy => {
+                         const option = document.createElement("option");
+                         option.value = strategy.id;
+                         option.textContent = strategy.name;
+                         strategySelect.appendChild(option);
+                     });
+                     strategyListLoader.classList.add("d-none");
+                     strategySelect.classList.remove("d-none");
+                 })
+                 .catch(err => {
+                     console.error(err);
+                     if (strategyListLoader) strategyListLoader.innerHTML = '<p class="text-danger">Error loading strategies.</p>';
+                 });
+        });
+
+        if (strategySelect) {
+            strategySelect.addEventListener("change", () => {
+                confirmChangeStrategyBtn.disabled = false;
+            });
+        }
+
+        if (confirmChangeStrategyBtn) {
+            confirmChangeStrategyBtn.addEventListener("click", () => {
+                const selectedStrategyId = strategySelect.value;
+                if (!selectedStrategyId) return;
+
+                confirmChangeStrategyBtn.disabled = true;
+                confirmChangeStrategyBtn.textContent = "Updating...";
+
+                fetch(`/sessions/${session_id}/change_strategy`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ strategy_id: selectedStrategyId })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert("Failed to change strategy.");
+                        confirmChangeStrategyBtn.disabled = false;
+                        confirmChangeStrategyBtn.textContent = "Apply Strategy & Restart";
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Error changing strategy.");
+                    confirmChangeStrategyBtn.disabled = false;
+                    confirmChangeStrategyBtn.textContent = "Apply Strategy & Restart";
+                });
+            });
+        }
+    }
+
+
     // Inicia o chat automaticamente se a sessão já estiver em andamento
     function iniciarChat() {
         let session_status = '';

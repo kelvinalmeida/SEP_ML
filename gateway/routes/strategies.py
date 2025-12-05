@@ -255,3 +255,11 @@ def handle_private_message(data):
         
     except RequestException as e:
         emit('error', {"details": f"Não foi possível enviar a mensagem privada: {str(e)}"})
+@strategy_bp.route('/strategies/strategies_json', methods=['GET'])
+def get_strategies_json():
+    try:
+        response = requests.get(f"{STRATEGIES_URL}/strategies")
+        strategies = response.json()
+        return jsonify(strategies), 200
+    except RequestException as e:
+        return jsonify({"error": "Strategies service unavailable", "details": str(e)}), 503

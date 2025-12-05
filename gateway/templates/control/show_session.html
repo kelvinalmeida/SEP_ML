@@ -77,6 +77,12 @@
                     {% endif %}
                     btn-success btn-lg mb-3">Iniciar Sessão</button>
 
+                    <button id="changeStrategyBtn" class="btn
+                    {% if current_user.type != 'teacher'%}
+                        d-none
+                    {% endif %}
+                    btn-warning btn-lg mb-3" data-bs-toggle="modal" data-bs-target="#changeStrategyModal">Mudar Estratégia</button>
+
                     <div>
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
 
@@ -357,6 +363,7 @@
     <!-- Bootstrap Bundle (inclui Popper) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+    {% include 'control/change_strategy_modal.html' %}
     <script src="{{ url_for('static', filename='js/show_session.js') }}"></script>
 
 </body>
