@@ -494,9 +494,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function removerElemento() {
-        let existingPdfContainer = document.getElementById("pdf_container");
-        if (existingPdfContainer && !reuso_isActive) {
-            existingPdfContainer.remove();
+        let reusoTabs = document.getElementById("reuso_tabs");
+        if (reusoTabs && !reuso_isActive) {
+            reusoTabs.remove();
         }
 
         let apresentacao_sincrona = document.getElementById("apresentacao_sincrona");
