@@ -3,20 +3,38 @@
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="changeStrategyModalLabel">Change Session Strategy</h5>
+            <h5 class="modal-title" id="changeStrategyModalLabel">Mudar Domínio ou Estratégia</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <p class="text-danger">Warning: Changing the strategy will reset the session for all users!</p>
+            <p class="text-danger">Warning: Changing the strategy or domain will reset the session for all users!</p>
+
+            <div class="mb-3 text-center">
+                <div class="btn-group" role="group" aria-label="Change Mode">
+                    <input type="radio" class="btn-check" name="changeMode" id="modeStrategy" value="strategy" checked>
+                    <label class="btn btn-outline-primary" for="modeStrategy">Estratégia</label>
+
+                    <input type="radio" class="btn-check" name="changeMode" id="modeDomain" value="domain">
+                    <label class="btn btn-outline-primary" for="modeDomain">Domínio</label>
+                </div>
+            </div>
+
             <div id="strategyListLoader" class="text-center">
                  <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
                   </div>
             </div>
+
             <select class="form-select d-none" id="strategySelect" aria-label="Select Strategy">
                 <option selected disabled>Select a strategy</option>
                 <!-- Options will be populated by JS -->
             </select>
+
+            <select class="form-select d-none" id="domainSelect" aria-label="Select Domain">
+                <option selected disabled>Select a domain</option>
+                <!-- Options will be populated by JS -->
+            </select>
+
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

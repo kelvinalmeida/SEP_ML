@@ -410,3 +410,41 @@ def change_session_strategy(session_id):
             conn.commit()
 
     return jsonify({"success": "Strategy changed and session restarted!"}), 200
+
+
+@session_bp.route('/sessions/<int:session_id>/change_domain', methods=['POST'])
+def change_session_domain(session_id):
+    data = request.get_json()
+    new_domain_id = data.get('domain_id')
+
+    if not new_domain_id:
+        return jsonify({"error": "Domain ID is required"}), 400
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Session not found"}), 404
+
+            # Update domain
+            # Clear existing domains and add the new one
+            cur.execute("DELETE FROM session_domains WHERE session_id = %s", (session_id,))
+            cur.execute("INSERT INTO session_domains (session_id, domain_id) VALUES (%s, %s)", (session_id, str(new_domain_id)))
+
+            # Clear verified answers (full reset)
+            cur.execute("DELETE FROM verified_answers WHERE session_id = %s", (session_id,))
+
+            # Reset session state
+            start_time = datetime.utcnow()
+            cur.execute("""
+                UPDATE session
+                SET status = 'in-progress',
+                    start_time = %s,
+                    current_tactic_index = 0,
+                    current_tactic_started_at = %s
+                WHERE id = %s
+            """, (start_time, start_time, session_id))
+
+            conn.commit()
+
+    return jsonify({"success": "Domain changed and session restarted!"}), 200
