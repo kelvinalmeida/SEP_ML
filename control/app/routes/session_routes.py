@@ -98,12 +98,13 @@ def create_session():
                     break
 
             cur.execute("""
-                INSERT INTO session (status, code)
-                VALUES (%s, %s)
+                INSERT INTO session (status, code, current_tactic_index)
+                VALUES (%s, %s, %s)
                 RETURNING id
             """, (
                 'aguardando',
-                code
+                code,
+                0
             ))
             session_id = cur.fetchone()['id']
 
@@ -188,10 +189,10 @@ def start_session(session_id):
             start_time = datetime.utcnow()
             cur.execute("""
                 UPDATE session
-                SET status = 'in-progress', start_time = %s
+                SET status = 'in-progress', start_time = %s, current_tactic_index = 0, current_tactic_started_at = %s
                 WHERE id = %s
                 RETURNING status, start_time
-            """, (start_time, session_id))
+            """, (start_time, start_time, session_id))
             updated = cur.fetchone()
             conn.commit()
 
@@ -214,6 +215,50 @@ def end_session(session_id):
             conn.commit()
 
     return jsonify({"session_id": session_id, "message": "Session ended!"})
+
+
+@session_bp.route('/sessions/tactic/next/<int:session_id>', methods=['POST'])
+def next_tactic(session_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, current_tactic_index FROM session WHERE id = %s", (session_id,))
+            session = cur.fetchone()
+            if not session:
+                return jsonify({"error": "Session not found"}), 404
+
+            new_index = session['current_tactic_index'] + 1
+            now = datetime.utcnow()
+
+            cur.execute("""
+                UPDATE session
+                SET current_tactic_index = %s, current_tactic_started_at = %s
+                WHERE id = %s
+            """, (new_index, now, session_id))
+            conn.commit()
+
+    return jsonify({"success": True, "current_tactic_index": new_index})
+
+
+@session_bp.route('/sessions/tactic/prev/<int:session_id>', methods=['POST'])
+def prev_tactic(session_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, current_tactic_index FROM session WHERE id = %s", (session_id,))
+            session = cur.fetchone()
+            if not session:
+                return jsonify({"error": "Session not found"}), 404
+
+            new_index = max(0, session['current_tactic_index'] - 1)
+            now = datetime.utcnow()
+
+            cur.execute("""
+                UPDATE session
+                SET current_tactic_index = %s, current_tactic_started_at = %s
+                WHERE id = %s
+            """, (new_index, now, session_id))
+            conn.commit()
+
+    return jsonify({"success": True, "current_tactic_index": new_index})
 
 
 @session_bp.route('/sessions/submit_answer', methods=['POST'])

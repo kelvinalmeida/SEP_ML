@@ -12,7 +12,9 @@ CREATE TABLE session (
     id SERIAL PRIMARY KEY,
     status VARCHAR(50) NOT NULL,
     code VARCHAR(50) NOT NULL UNIQUE,
-    start_time TIMESTAMP
+    start_time TIMESTAMP,
+    current_tactic_index INTEGER DEFAULT 0,
+    current_tactic_started_at TIMESTAMP
 );
 
 -- 2. Tabelas normalizadas (Relacionamentos)
