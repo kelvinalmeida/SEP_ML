@@ -424,3 +424,30 @@ def change_strategy(session_id, current_user=None):
 
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
+
+@session_bp.route('/sessions/<int:session_id>/change_domain', methods=['POST'])
+@token_required
+def change_domain(session_id, current_user=None):
+    if current_user and current_user.get('type') != 'teacher':
+         return jsonify({"error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json()
+        domain_id = data.get('domain_id')
+
+        if not domain_id:
+             return jsonify({"error": "Domain ID is required"}), 400
+
+        # Call Control Service to update
+        response = requests.post(
+            f"{CONTROL_URL}/sessions/{session_id}/change_domain",
+            json={'domain_id': domain_id}
+        )
+
+        if response.status_code == 200:
+             return jsonify(response.json()), 200
+        else:
+             return jsonify({"error": "Failed to update domain", "details": response.text}), response.status_code
+
+    except RequestException as e:
+        return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
