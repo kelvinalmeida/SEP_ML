@@ -397,3 +397,30 @@ def get_current_tactic(session_id):
         'current_tactic_index': current_tactic_index
     })
 
+
+@session_bp.route('/sessions/<int:session_id>/change_strategy', methods=['POST'])
+@token_required
+def change_strategy(session_id, current_user=None):
+    if current_user and current_user.get('type') != 'teacher':
+         return jsonify({"error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json()
+        strategy_id = data.get('strategy_id')
+
+        if not strategy_id:
+             return jsonify({"error": "Strategy ID is required"}), 400
+
+        # Call Control Service to update
+        response = requests.post(
+            f"{CONTROL_URL}/sessions/{session_id}/change_strategy",
+            json={'strategy_id': strategy_id}
+        )
+
+        if response.status_code == 200:
+             return jsonify(response.json()), 200
+        else:
+             return jsonify({"error": "Failed to update strategy", "details": response.text}), response.status_code
+
+    except RequestException as e:
+        return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
