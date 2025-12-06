@@ -133,6 +133,16 @@ def get_domain(current_user=None, domain_id=None):
     # return jsonify(domain), 200  # Retorna os detalhes do domínio em formato JSON
 
 
+@domain_bp.route("/domains/domains_json", methods=["GET"])
+def get_domains_json():
+    try:
+        response = requests.get(f"{DOMAIN_URL}/domains")
+        response.raise_for_status()
+        return jsonify(response.json()), 200
+    except RequestException as e:
+        return jsonify({"error": "Domain service unavailable", "details": str(e)}), 503
+
+
 @domain_bp.route('/pdfs/<int:pdf_id>', methods=['GET'])
 @token_required
 def proxy_pdf_download(current_user=None, pdf_id=None):

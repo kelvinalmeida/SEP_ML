@@ -81,7 +81,7 @@
                     {% if current_user.type != 'teacher'%}
                         d-none
                     {% endif %}
-                    btn-warning btn-lg mb-3" data-bs-toggle="modal" data-bs-target="#changeStrategyModal">Mudar Estratégia</button>
+                    btn-warning btn-lg mb-3" data-bs-toggle="modal" data-bs-target="#changeStrategyModal">Mudar Dominio ou Estratégia</button>
 
                     <div>
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
@@ -316,7 +316,6 @@
         window.token = "{{ token }}";
         let session_json = {{ session | tojson }};
         let current_user_json = {{ current_user | tojson }};
-        window.videos_uploaded_id = session_json.domains[0].videos_uploaded[0].id;
         window.domain_id = session_json.domains[0].id;
         window.my_username = current_user_json.username;
         window.my_id = current_user_json.id;

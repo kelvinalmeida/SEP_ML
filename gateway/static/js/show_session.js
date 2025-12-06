@@ -10,7 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const session_id = window.session_id;
     const token = window.token;
-    const videos_uploaded_id = window.videos_uploaded_id;
     const domain_id = window.domain_id;
     const my_username = window.my_username;
     const my_id = window.my_id;
@@ -494,9 +493,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     function removerElemento() {
-        let existingPdfContainer = document.getElementById("pdf_container");
-        if (existingPdfContainer && !reuso_isActive) {
-            existingPdfContainer.remove();
+        let reusoTabs = document.getElementById("reuso_tabs");
+        if (reusoTabs && !reuso_isActive) {
+            reusoTabs.remove();
         }
 
         let apresentacao_sincrona = document.getElementById("apresentacao_sincrona");
@@ -621,19 +620,29 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Change Strategy Modal Logic
+    // Change Strategy/Domain Modal Logic
     const changeStrategyBtn = document.getElementById("changeStrategyBtn");
     const strategySelect = document.getElementById("strategySelect");
+    const domainSelect = document.getElementById("domainSelect");
     const strategyListLoader = document.getElementById("strategyListLoader");
     const confirmChangeStrategyBtn = document.getElementById("confirmChangeStrategyBtn");
+    const modeStrategy = document.getElementById("modeStrategy");
+    const modeDomain = document.getElementById("modeDomain");
 
     if (changeStrategyBtn) {
         changeStrategyBtn.addEventListener("click", () => {
             // Reset modal state
-            if (strategySelect) strategySelect.classList.add("d-none");
+            if (strategySelect) {
+                strategySelect.classList.add("d-none");
+                strategySelect.innerHTML = '<option selected disabled>Select a strategy</option>';
+            }
+            if (domainSelect) {
+                domainSelect.classList.add("d-none");
+                domainSelect.innerHTML = '<option selected disabled>Select a domain</option>';
+            }
             if (strategyListLoader) strategyListLoader.classList.remove("d-none");
-            if (strategySelect) strategySelect.innerHTML = '<option selected disabled>Select a strategy</option>';
             if (confirmChangeStrategyBtn) confirmChangeStrategyBtn.disabled = true;
+            if (modeStrategy) modeStrategy.checked = true;
 
             // Fetch strategies
             fetch('/strategies/strategies_json')
@@ -648,14 +657,54 @@ document.addEventListener("DOMContentLoaded", () => {
                          option.textContent = strategy.name;
                          strategySelect.appendChild(option);
                      });
-                     strategyListLoader.classList.add("d-none");
-                     strategySelect.classList.remove("d-none");
+                     // Only show if strategy mode is active (default)
+                     if (modeStrategy.checked) {
+                         strategyListLoader.classList.add("d-none");
+                         strategySelect.classList.remove("d-none");
+                     }
                  })
                  .catch(err => {
                      console.error(err);
-                     if (strategyListLoader) strategyListLoader.innerHTML = '<p class="text-danger">Error loading strategies.</p>';
+                 });
+
+            // Fetch domains
+            fetch('/domains/domains_json')
+                 .then(response => {
+                     if(!response.ok) throw new Error("Failed to fetch domains");
+                     return response.json();
+                 })
+                 .then(data => {
+                     data.forEach(domain => {
+                         const option = document.createElement("option");
+                         option.value = domain.id;
+                         option.textContent = domain.name;
+                         domainSelect.appendChild(option);
+                     });
+                 })
+                 .catch(err => {
+                     console.error(err);
                  });
         });
+
+        // Toggle handling
+        if (modeStrategy && modeDomain) {
+            const toggleMode = () => {
+                strategyListLoader.classList.add("d-none"); // Hide loader once loaded
+                if (modeStrategy.checked) {
+                    strategySelect.classList.remove("d-none");
+                    domainSelect.classList.add("d-none");
+                    confirmChangeStrategyBtn.textContent = "Apply Strategy & Restart";
+                    confirmChangeStrategyBtn.disabled = strategySelect.value === "Select a strategy";
+                } else {
+                    strategySelect.classList.add("d-none");
+                    domainSelect.classList.remove("d-none");
+                    confirmChangeStrategyBtn.textContent = "Apply Domain & Restart";
+                    confirmChangeStrategyBtn.disabled = domainSelect.value === "Select a domain";
+                }
+            };
+            modeStrategy.addEventListener("change", toggleMode);
+            modeDomain.addEventListener("change", toggleMode);
+        }
 
         if (strategySelect) {
             strategySelect.addEventListener("change", () => {
@@ -663,37 +712,78 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
+        if (domainSelect) {
+            domainSelect.addEventListener("change", () => {
+                confirmChangeStrategyBtn.disabled = false;
+            });
+        }
+
         if (confirmChangeStrategyBtn) {
             confirmChangeStrategyBtn.addEventListener("click", () => {
-                const selectedStrategyId = strategySelect.value;
-                if (!selectedStrategyId) return;
 
-                confirmChangeStrategyBtn.disabled = true;
-                confirmChangeStrategyBtn.textContent = "Updating...";
+                const isStrategyMode = modeStrategy.checked;
 
-                fetch(`/sessions/${session_id}/change_strategy`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ strategy_id: selectedStrategyId })
-                })
-                .then(response => {
-                    if (response.ok) {
-                        location.reload();
-                    } else {
-                        alert("Failed to change strategy.");
+                if (isStrategyMode) {
+                    const selectedStrategyId = strategySelect.value;
+                    if (!selectedStrategyId) return;
+
+                    confirmChangeStrategyBtn.disabled = true;
+                    confirmChangeStrategyBtn.textContent = "Updating...";
+
+                    fetch(`/sessions/${session_id}/change_strategy`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ strategy_id: selectedStrategyId })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            location.reload();
+                        } else {
+                            alert("Failed to change strategy.");
+                            confirmChangeStrategyBtn.disabled = false;
+                            confirmChangeStrategyBtn.textContent = "Apply Strategy & Restart";
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("Error changing strategy.");
                         confirmChangeStrategyBtn.disabled = false;
                         confirmChangeStrategyBtn.textContent = "Apply Strategy & Restart";
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert("Error changing strategy.");
-                    confirmChangeStrategyBtn.disabled = false;
-                    confirmChangeStrategyBtn.textContent = "Apply Strategy & Restart";
-                });
+                    });
+                } else {
+                    const selectedDomainId = domainSelect.value;
+                    if (!selectedDomainId) return;
+
+                    confirmChangeStrategyBtn.disabled = true;
+                    confirmChangeStrategyBtn.textContent = "Updating...";
+
+                    fetch(`/sessions/${session_id}/change_domain`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ domain_id: selectedDomainId })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            location.reload();
+                        } else {
+                            alert("Failed to change domain.");
+                            confirmChangeStrategyBtn.disabled = false;
+                            confirmChangeStrategyBtn.textContent = "Apply Domain & Restart";
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("Error changing domain.");
+                        confirmChangeStrategyBtn.disabled = false;
+                        confirmChangeStrategyBtn.textContent = "Apply Domain & Restart";
+                    });
+                }
             });
         }
     }
