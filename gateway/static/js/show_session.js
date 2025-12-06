@@ -10,7 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const session_id = window.session_id;
     const token = window.token;
-    const videos_uploaded_id = window.videos_uploaded_id;
     const domain_id = window.domain_id;
     const my_username = window.my_username;
     const my_id = window.my_id;
