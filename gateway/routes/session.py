@@ -226,7 +226,54 @@ def next_tactic(session_id, current_user=None):
          return jsonify({"error": "Unauthorized"}), 403
 
     try:
+        # 1. Advance the tactic on Control Service
         response = requests.post(f"{CONTROL_URL}/sessions/tactic/next/{session_id}")
+        if response.status_code != 200:
+             return (response.text, response.status_code, response.headers.items())
+
+        # 2. Check the NEW tactic to see if it is "Mudanca de Estrategia"
+        # We need to fetch the session status/current tactic to know what it is.
+        # Ideally, next_tactic from control could return this info, but it returns {success, index}.
+
+        # Re-using the logic from get_current_tactic to find what the current tactic IS.
+        # Fetch Session from Control
+        session_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
+        if session_res.status_code != 200:
+            return jsonify({"error": "Failed to fetch session details"}), 500
+
+        session_json = session_res.json()
+        current_tactic_index = session_json.get("current_tactic_index", 0)
+
+        # Fetch Strategy Details
+        # Assuming single strategy or we take the first one
+        if not session_json.get('strategies'):
+            return (response.text, response.status_code, response.headers.items())
+
+        strategy_id = session_json['strategies'][0]
+        strategy_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
+
+        if strategy_res.status_code == 200:
+            strategy_data = strategy_res.json()
+            tactics = strategy_data.get('tatics', [])
+
+            if 0 <= current_tactic_index < len(tactics):
+                current_tactic = tactics[current_tactic_index]
+
+                # Check if it is the switch tactic
+                if current_tactic['name'] == "Mudanca de Estrategia":
+                    target_strategy_id = current_tactic.get('description')
+
+                    if target_strategy_id and target_strategy_id.isdigit():
+                        # Trigger the temporary switch
+                        switch_res = requests.post(
+                            f"{CONTROL_URL}/sessions/{session_id}/temp_switch_strategy",
+                            json={'strategy_id': int(target_strategy_id)}
+                        )
+                        # We don't necessarily need to return the switch response,
+                        # the frontend will poll /current_tactic and see the new strategy's first tactic.
+                        if switch_res.status_code != 200:
+                             logging.error(f"Failed to auto-switch strategy: {switch_res.text}")
+
         return (response.text, response.status_code, response.headers.items())
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
@@ -323,13 +370,13 @@ def get_current_tactic(session_id):
 
     # Fetch all tactics
     tactics = []
-    for strategy_id in session_json['strategies']:
-        strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
-        if strategy_response.status_code != 200:
-            continue
-        strategy_data = strategy_response.json()
-        strategy_tactics = strategy_data.get('tatics', [])
-        tactics.extend(strategy_tactics)
+    current_strategy_id = None
+    if session_json['strategies']:
+         current_strategy_id = session_json['strategies'][0]
+         strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{current_strategy_id}")
+         if strategy_response.status_code == 200:
+             strategy_data = strategy_response.json()
+             tactics = strategy_data.get('tatics', [])
 
     # Check bounds
     if current_tactic_index >= len(tactics):
@@ -361,16 +408,23 @@ def get_current_tactic(session_id):
              # The Control service uses datetime.utcnow() so it might be returned as string in JSON
              # Check if it is the RFC format used in start_time or ISO
 
-             # If it looks like ISO
-             if 'T' in started_at_str:
-                 started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S.%f")
-             else:
-                 # Try the format used previously: "%a, %d %b %Y %H:%M:%S %Z"
+             # Parse date string from Control service
+             # Supported formats:
+             # 1. RFC 1123 (e.g., "Fri, 19 Dec 2025 20:20:27 GMT") - Default for Flask jsonify
+             # 2. ISO 8601 with microseconds (e.g., "2024-11-05T18:30:00.123456")
+             # 3. ISO 8601 without microseconds (e.g., "2024-11-05T18:30:00")
+             # 4. Postgres simple format (e.g., "2024-11-05 18:30:00")
+
+             try:
+                 started_at = datetime.strptime(started_at_str, "%a, %d %b %Y %H:%M:%S %Z")
+             except ValueError:
                  try:
-                    started_at = datetime.strptime(started_at_str, "%a, %d %b %Y %H:%M:%S %Z")
+                     started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S.%f")
                  except ValueError:
-                    # Try another common postgres format "2024-11-05 18:30:00"
-                    started_at = datetime.strptime(started_at_str, "%Y-%m-%d %H:%M:%S")
+                     try:
+                         started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S")
+                     except ValueError:
+                         started_at = datetime.strptime(started_at_str, "%Y-%m-%d %H:%M:%S")
 
              elapsed_time = (datetime.utcnow() - started_at).total_seconds()
              duration_seconds = current_tactic.get('time', 0) * 60
@@ -394,7 +448,8 @@ def get_current_tactic(session_id):
         'elapsed_time': int(elapsed_time),
         'strategy_tactics': tactics,
         'session_status': session_json['status'],
-        'current_tactic_index': current_tactic_index
+        'current_tactic_index': current_tactic_index,
+        'strategy_id': current_strategy_id
     })
 
 

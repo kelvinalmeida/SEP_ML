@@ -24,6 +24,9 @@ class Session(db.Model):
     code = db.Column(db.String(50), nullable=False, unique=True)
     start_time = db.Column(db.DateTime)
 
+    # New column for temporary strategy switching
+    original_strategy_id = db.Column(db.String(50), nullable=True)
+
     verified_answers = db.relationship('VerifiedAnswers', backref='session', lazy='joined')
     estra_notes = db.relationship('ExtraNotes', backref='session', lazy='joined')
 
@@ -47,6 +50,7 @@ class Session(db.Model):
             'code': self.code,
             'domains': self.domains,
             'start_time': self.start_time,
+            'original_strategy_id': self.original_strategy_id,
             'verified_answers': [va.to_dict() for va in self.verified_answers],
             'extra_notes': [en.to_dict() for en in self.estra_notes]
         }
