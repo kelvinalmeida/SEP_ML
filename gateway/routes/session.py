@@ -408,16 +408,23 @@ def get_current_tactic(session_id):
              # The Control service uses datetime.utcnow() so it might be returned as string in JSON
              # Check if it is the RFC format used in start_time or ISO
 
-             # If it looks like ISO
-             if 'T' in started_at_str:
-                 started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S.%f")
-             else:
-                 # Try the format used previously: "%a, %d %b %Y %H:%M:%S %Z"
+             # Parse date string from Control service
+             # Supported formats:
+             # 1. RFC 1123 (e.g., "Fri, 19 Dec 2025 20:20:27 GMT") - Default for Flask jsonify
+             # 2. ISO 8601 with microseconds (e.g., "2024-11-05T18:30:00.123456")
+             # 3. ISO 8601 without microseconds (e.g., "2024-11-05T18:30:00")
+             # 4. Postgres simple format (e.g., "2024-11-05 18:30:00")
+
+             try:
+                 started_at = datetime.strptime(started_at_str, "%a, %d %b %Y %H:%M:%S %Z")
+             except ValueError:
                  try:
-                    started_at = datetime.strptime(started_at_str, "%a, %d %b %Y %H:%M:%S %Z")
+                     started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S.%f")
                  except ValueError:
-                    # Try another common postgres format "2024-11-05 18:30:00"
-                    started_at = datetime.strptime(started_at_str, "%Y-%m-%d %H:%M:%S")
+                     try:
+                         started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S")
+                     except ValueError:
+                         started_at = datetime.strptime(started_at_str, "%Y-%m-%d %H:%M:%S")
 
              elapsed_time = (datetime.utcnow() - started_at).total_seconds()
              duration_seconds = current_tactic.get('time', 0) * 60
