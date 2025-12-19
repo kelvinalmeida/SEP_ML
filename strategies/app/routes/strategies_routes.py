@@ -452,6 +452,7 @@ def ids_to_names():
         # Monta o resultado no formato exato que você pediu.
         result = [
             {
+                "id": s['id'],
                 "name": s['name'],
                 "tatics": s['tatics']
             } 
