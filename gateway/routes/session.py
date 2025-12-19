@@ -260,7 +260,7 @@ def next_tactic(session_id, current_user=None):
                 current_tactic = tactics[current_tactic_index]
 
                 # Check if it is the switch tactic
-                if current_tactic['name'] == "Mudanca de Estrategia":
+                if current_tactic['name'] in ["Mudanca de Estrategia", "Mudança de Estratégia"]:
                     target_strategy_id = current_tactic.get('description')
 
                     if target_strategy_id and target_strategy_id.isdigit():
