@@ -370,13 +370,13 @@ def get_current_tactic(session_id):
 
     # Fetch all tactics
     tactics = []
-    for strategy_id in session_json['strategies']:
-        strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
-        if strategy_response.status_code != 200:
-            continue
-        strategy_data = strategy_response.json()
-        strategy_tactics = strategy_data.get('tatics', [])
-        tactics.extend(strategy_tactics)
+    current_strategy_id = None
+    if session_json['strategies']:
+         current_strategy_id = session_json['strategies'][0]
+         strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{current_strategy_id}")
+         if strategy_response.status_code == 200:
+             strategy_data = strategy_response.json()
+             tactics = strategy_data.get('tatics', [])
 
     # Check bounds
     if current_tactic_index >= len(tactics):
@@ -448,7 +448,8 @@ def get_current_tactic(session_id):
         'elapsed_time': int(elapsed_time),
         'strategy_tactics': tactics,
         'session_status': session_json['status'],
-        'current_tactic_index': current_tactic_index
+        'current_tactic_index': current_tactic_index,
+        'strategy_id': current_strategy_id
     })
 
 

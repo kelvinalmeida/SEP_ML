@@ -528,6 +528,13 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .then(data => {
                 console.log("Dados da tática atual: ", data);
+
+                if (data.strategy_id && window.current_strategy_id && data.strategy_id != window.current_strategy_id) {
+                    console.log("Strategy changed, reloading page...");
+                    location.reload();
+                    return;
+                }
+
                 if (data.tactic && data.session_status === 'in-progress') {
                     document.getElementById("tacticName").innerText = data.tactic.name;
                     taticDescription(data.tactic.description || "Nenhuma descrição disponível");
