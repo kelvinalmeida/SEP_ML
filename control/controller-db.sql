@@ -14,7 +14,8 @@ CREATE TABLE session (
     code VARCHAR(50) NOT NULL UNIQUE,
     start_time TIMESTAMP,
     current_tactic_index INTEGER DEFAULT 0,
-    current_tactic_started_at TIMESTAMP
+    current_tactic_started_at TIMESTAMP,
+    original_strategy_id VARCHAR(50)
 );
 
 -- 2. Tabelas normalizadas (Relacionamentos)

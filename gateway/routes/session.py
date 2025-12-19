@@ -226,7 +226,54 @@ def next_tactic(session_id, current_user=None):
          return jsonify({"error": "Unauthorized"}), 403
 
     try:
+        # 1. Advance the tactic on Control Service
         response = requests.post(f"{CONTROL_URL}/sessions/tactic/next/{session_id}")
+        if response.status_code != 200:
+             return (response.text, response.status_code, response.headers.items())
+
+        # 2. Check the NEW tactic to see if it is "Mudanca de Estrategia"
+        # We need to fetch the session status/current tactic to know what it is.
+        # Ideally, next_tactic from control could return this info, but it returns {success, index}.
+
+        # Re-using the logic from get_current_tactic to find what the current tactic IS.
+        # Fetch Session from Control
+        session_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
+        if session_res.status_code != 200:
+            return jsonify({"error": "Failed to fetch session details"}), 500
+
+        session_json = session_res.json()
+        current_tactic_index = session_json.get("current_tactic_index", 0)
+
+        # Fetch Strategy Details
+        # Assuming single strategy or we take the first one
+        if not session_json.get('strategies'):
+            return (response.text, response.status_code, response.headers.items())
+
+        strategy_id = session_json['strategies'][0]
+        strategy_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
+
+        if strategy_res.status_code == 200:
+            strategy_data = strategy_res.json()
+            tactics = strategy_data.get('tatics', [])
+
+            if 0 <= current_tactic_index < len(tactics):
+                current_tactic = tactics[current_tactic_index]
+
+                # Check if it is the switch tactic
+                if current_tactic['name'] == "Mudanca de Estrategia":
+                    target_strategy_id = current_tactic.get('description')
+
+                    if target_strategy_id and target_strategy_id.isdigit():
+                        # Trigger the temporary switch
+                        switch_res = requests.post(
+                            f"{CONTROL_URL}/sessions/{session_id}/temp_switch_strategy",
+                            json={'strategy_id': int(target_strategy_id)}
+                        )
+                        # We don't necessarily need to return the switch response,
+                        # the frontend will poll /current_tactic and see the new strategy's first tactic.
+                        if switch_res.status_code != 200:
+                             logging.error(f"Failed to auto-switch strategy: {switch_res.text}")
+
         return (response.text, response.status_code, response.headers.items())
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
