@@ -45,7 +45,7 @@ services:
       LC_CTYPE: C.UTF-8
     volumes:
       - db_data_controller:/var/lib/postgresql/18/data
-      - ./control/controller-db-backup.sql:/docker-entrypoint-initdb.d/controller-db-backup.sql
+      - ./control/controller-db.sql:/docker-entrypoint-initdb.d/controller-db.sql
     # You might want to map this to a different port to inspect it
     ports:
       - "5439:5432"
@@ -60,7 +60,7 @@ services:
       LC_CTYPE: C.UTF-8
     volumes:
       - db_data_user:/var/lib/postgresql/18/data
-      - ./user/user-db-backup.sql:/docker-entrypoint-initdb.d/user-db-backup.sql
+      - ./user/user-db.sql:/docker-entrypoint-initdb.d/user-db.sql
     # You might want to map this to a different port to inspect it
     ports:
       - "5433:5432"
@@ -93,7 +93,7 @@ services:
       LC_CTYPE: C.UTF-8
     volumes:
       - db_data_strategies:/var/lib/postgresql/18/data
-      - ./strategies/strategies-db-backup.sql:/docker-entrypoint-initdb.d/strategies-db-backup.sql
+      - ./strategies/strategies-db.sql:/docker-entrypoint-initdb.d/strategies-db.sql
     # You might want to map this to a different port to inspect it
     ports:
       - "5436:5432"
@@ -144,7 +144,7 @@ services:
       LC_CTYPE: C.UTF-8
     volumes:
       - db_data_domain:/var/lib/postgresql/18/data
-      - ./domain/domain-db-backup.sql:/docker-entrypoint-initdb.d/domain-db-backup.sql
+      - ./domain/domain-db.sql:/docker-entrypoint-initdb.d/domain-db.sql
     # You might want to map this to a different port to inspect it
     ports:
       - "5437:5432"

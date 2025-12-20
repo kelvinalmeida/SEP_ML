@@ -200,12 +200,21 @@ def get_session_status(session_id, current_user=None):
 @token_required
 def start_session(session_id, current_user=None):
     try:
-        session_status = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}").json()
-        if(session_status["status"] == "in-progress"):
-            return jsonify({"error": "Session already in progress"}), 400
+        # --- REMOVIDO/COMENTADO O BLOQUEIO ---
+        # A verificação abaixo impedia reiniciar sessões travadas
+        # session_status = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}").json()
+        # if(session_status["status"] == "in-progress"):
+        #     return jsonify({"error": "Session already in progress"}), 400
         
+        # O Control Service já sabe reiniciar (zerar o índice) quando recebe o comando start
         response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
-        return jsonify(response.json()), response.status_code
+        
+        # Verifica se o JSON existe antes de retornar
+        try:
+            return jsonify(response.json()), response.status_code
+        except:
+            return response.text, response.status_code
+
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
@@ -215,7 +224,12 @@ def start_session(session_id, current_user=None):
 def end_session(session_id, current_user=None):
     try:
         response = requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
-        return (response.text, response.status_code, response.headers.items())
+        
+        # --- CORREÇÃO AQUI ---
+        # Não repasse response.headers.items() cegamente, isso pode causar Erro 500 no Flask
+        # Retorne apenas o texto e o status code
+        return response.text, response.status_code
+
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
     
