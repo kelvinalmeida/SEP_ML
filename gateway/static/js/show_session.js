@@ -108,7 +108,24 @@ document.addEventListener("DOMContentLoaded", () => {
             if (timeLeft <= 0) {
                 clearInterval(countdownInterval);
                 document.getElementById("tacticTimer").innerText = "Concluído";
-                fetchCurrentTactic(session_id); // Pega próxima tática
+                // --- CÓDIGO NOVO: Tenta avançar automaticamente ---
+                const nextBtn = document.getElementById("nextTacticBtn");
+                // Verifica se o botão existe e não está oculto (é professor)
+                if (nextBtn && !nextBtn.classList.contains("d-none")) {
+                    console.log("Tempo esgotado. Avançando para a próxima tática/estratégia...");
+                    
+                    // Chama a rota de avançar
+                    fetch(`/sessions/${session_id}/next_tactic`, { method: 'POST' })
+                    .then(response => {
+                        if(response.ok) {
+                            // Atualiza a tela (vai detectar a troca de estratégia se houver)
+                            fetchCurrentTactic(session_id);
+                        }
+                    });
+                } else {
+                    // Se for aluno, apenas atualiza para ver se o professor mudou
+                    fetchCurrentTactic(session_id); 
+                }
             } else {
                 let minutes = Math.floor(timeLeft / 60);
                 let seconds = timeLeft % 60;

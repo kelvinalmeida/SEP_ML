@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+import re
 from urllib import response
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from requests.exceptions import RequestException
@@ -217,7 +218,7 @@ def end_session(session_id, current_user=None):
         return (response.text, response.status_code, response.headers.items())
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
-
+    
 
 @session_bp.route('/sessions/<int:session_id>/next_tactic', methods=['POST'])
 @token_required
@@ -226,17 +227,12 @@ def next_tactic(session_id, current_user=None):
          return jsonify({"error": "Unauthorized"}), 403
 
     try:
-        # 1. Advance the tactic on Control Service
+        # 1. Avança a tática no Microserviço de Controle
         response = requests.post(f"{CONTROL_URL}/sessions/tactic/next/{session_id}")
         if response.status_code != 200:
              return (response.text, response.status_code, response.headers.items())
 
-        # 2. Check the NEW tactic to see if it is "Mudanca de Estrategia"
-        # We need to fetch the session status/current tactic to know what it is.
-        # Ideally, next_tactic from control could return this info, but it returns {success, index}.
-
-        # Re-using the logic from get_current_tactic to find what the current tactic IS.
-        # Fetch Session from Control
+        # 2. Verifica se a NOVA tática é do tipo "Mudança de Estratégia"
         session_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
         if session_res.status_code != 200:
             return jsonify({"error": "Failed to fetch session details"}), 500
@@ -244,12 +240,12 @@ def next_tactic(session_id, current_user=None):
         session_json = session_res.json()
         current_tactic_index = session_json.get("current_tactic_index", 0)
 
-        # Fetch Strategy Details
-        # Assuming single strategy or we take the first one
         if not session_json.get('strategies'):
             return (response.text, response.status_code, response.headers.items())
 
         strategy_id = session_json['strategies'][0]
+
+
         strategy_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
 
         if strategy_res.status_code == 200:
@@ -258,21 +254,33 @@ def next_tactic(session_id, current_user=None):
 
             if 0 <= current_tactic_index < len(tactics):
                 current_tactic = tactics[current_tactic_index]
+                
+                # --- LÓGICA DE DETECÇÃO MELHORADA ---
+                tactic_name = current_tactic['name'].strip().lower()
+                valid_names = ["mudanca de estrategia", "mudança de estratégia", "mudança de estrategia", "mudanca de estratégia"]
 
-                # Check if it is the switch tactic
-                if current_tactic['name'] in ["Mudanca de Estrategia", "Mudança de Estratégia"]:
-                    target_strategy_id = current_tactic.get('description')
+                # Verifica se o nome bate (ignorando maiúsculas/minúsculas)
+                if tactic_name in valid_names:
+                    description = str(current_tactic.get('description', ''))
+                    
+                    # Usa Regex para encontrar o primeiro número na descrição (o ID da estratégia)
+                    match = re.search(r'\d+', description)
 
-                    if target_strategy_id and target_strategy_id.isdigit():
-                        # Trigger the temporary switch
+                    if match:
+                        target_strategy_id = int(match.group())
+                        
+                        logging.info(f"Detectada mudança de estratégia para ID: {target_strategy_id}")
+
+                        # Aciona a troca temporária
                         switch_res = requests.post(
                             f"{CONTROL_URL}/sessions/{session_id}/temp_switch_strategy",
-                            json={'strategy_id': int(target_strategy_id)}
+                            json={'strategy_id': target_strategy_id}
                         )
-                        # We don't necessarily need to return the switch response,
-                        # the frontend will poll /current_tactic and see the new strategy's first tactic.
+                        
                         if switch_res.status_code != 200:
                              logging.error(f"Failed to auto-switch strategy: {switch_res.text}")
+                    else:
+                        logging.warning(f"Tática '{current_tactic['name']}' ativa, mas nenhum ID numérico encontrado na descrição: '{description}'")
 
         return (response.text, response.status_code, response.headers.items())
     except RequestException as e:
@@ -380,13 +388,18 @@ def get_current_tactic(session_id):
 
     # Check bounds
     if current_tactic_index >= len(tactics):
-         # Se ultrapassou o número de táticas, pode considerar finalizada ou apenas esperar
-         # Se a intenção é finalizar automaticamente quando acaba:
-         # requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
-         # return jsonify({'message': 'All tactics completed', 'session_status': 'finished'})
+        # Se ultrapassou o número de táticas, pode considerar finalizada ou apenas esperar
+        # Se a intenção é finalizar automaticamente quando acaba:
+        # requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
+        # return jsonify({'message': 'All tactics completed', 'session_status': 'finished'})
 
-         # Mas como agora é manual, talvez só mostre que acabou
-         return jsonify({'message': 'No more tactics', 'session_status': 'finished'})
+        if session_json['status'] == 'in-progress':
+            logging.info(f"Fim das táticas atingido para a sessão {session_id}. Encerrando automaticamente.")
+            requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
+            session_json['status'] = 'finished'
+
+        # Mas como agora é manual, talvez só mostre que acabou
+        return jsonify({'message': 'No more tactics', 'session_status': 'finished'})
 
     current_tactic = tactics[current_tactic_index]
 
