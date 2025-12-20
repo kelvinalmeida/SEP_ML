@@ -104,6 +104,17 @@
     </div>
 
     <script>
+        let availableStrategies = [];
+
+        // Fetch strategies on load
+        fetch('/strategies/strategies_json')
+            .then(r => r.json())
+            .then(data => {
+                availableStrategies = data;
+            })
+            .catch(err => console.error("Error loading strategies:", err));
+
+
         const draggables = document.querySelectorAll('.draggable');
         const dropzone = document.getElementById('dropzone');
 
@@ -134,8 +145,6 @@
         });
 
 
-
-        <!-- trecho atualizado da função addTacticToDropzone -->
         function addTacticToDropzone(tacticName) {
             const wrapper = document.createElement('div');
             wrapper.classList.add('input-group', 'mb-2', 'sortable-item');
@@ -164,17 +173,46 @@
             inputTime.max = '60';
             inputTime.step = '0.01';
 
-            const inputDescription = document.createElement('input');
-            inputDescription.type = 'text';
-            inputDescription.name = 'description';
-            inputDescription.className = 'form-control w-50';
-            if (tacticName == "Apresentacao Sincrona") {
-                inputDescription.placeholder = 'Adicione o link do google Meet ou Zoom';
-                inputDescription.required = true;
+            wrapper.appendChild(orderSpan);
+            wrapper.appendChild(inputHidden);
+            wrapper.appendChild(tacticText);
+            wrapper.appendChild(inputTime);
+
+            // Special handling for "Mudanca de Estrategia"
+            if (tacticName === "Mudanca de Estrategia") {
+                const selectStrategy = document.createElement('select');
+                selectStrategy.name = 'description';
+                selectStrategy.className = 'form-select w-50';
+                selectStrategy.required = true;
+
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = "";
+                defaultOpt.text = "Selecione a estratégia de destino";
+                defaultOpt.disabled = true;
+                defaultOpt.selected = true;
+                selectStrategy.appendChild(defaultOpt);
+
+                availableStrategies.forEach(strat => {
+                    const opt = document.createElement('option');
+                    opt.value = strat.id;
+                    opt.text = strat.name;
+                    selectStrategy.appendChild(opt);
+                });
+                wrapper.appendChild(selectStrategy);
+
             } else {
-                // inputDescription.type = 'hidden';
-                inputDescription.placeholder = 'Adicone uma descrição (opcional)';
-                // inputDescription.value = 'hidden';
+                const inputDescription = document.createElement('input');
+                inputDescription.type = 'text';
+                inputDescription.name = 'description';
+                inputDescription.className = 'form-control w-50';
+
+                if (tacticName === "Apresentacao Sincrona") {
+                    inputDescription.placeholder = 'Adicione o link do Google Meet ou Zoom';
+                    inputDescription.required = true;
+                } else {
+                    inputDescription.placeholder = 'Adicione uma descrição (opcional)';
+                }
+                wrapper.appendChild(inputDescription);
             }
 
             const deleteBtn = document.createElement('button');
@@ -186,14 +224,8 @@
                 updateOrderNumbers();
             };
 
-            wrapper.appendChild(orderSpan);
-            wrapper.appendChild(inputHidden);
-            wrapper.appendChild(tacticText);
-            wrapper.appendChild(inputTime);
-            wrapper.appendChild(inputDescription);
             wrapper.appendChild(deleteBtn);
             dropzone.appendChild(wrapper);
-
 
             enableDragAndDrop();
             updateOrderNumbers();

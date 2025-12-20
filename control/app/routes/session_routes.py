@@ -207,14 +207,70 @@ def start_session(session_id):
 def end_session(session_id):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
-            if not cur.fetchone():
+            cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
+            session = cur.fetchone()
+            if not session:
                 return jsonify({"error": "Session not found"}), 404
 
-            cur.execute("UPDATE session SET status = 'finished' WHERE id = %s", (session_id,))
+            # Revert to original strategy if it was changed
+            if session['original_strategy_id']:
+                original_strategy_id = session['original_strategy_id']
+                # Revert session_strategies
+                cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
+                cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
+                           (session_id, str(original_strategy_id)))
+
+                # Clear the original_strategy_id column
+                cur.execute("UPDATE session SET status = 'finished', original_strategy_id = NULL WHERE id = %s", (session_id,))
+            else:
+                cur.execute("UPDATE session SET status = 'finished' WHERE id = %s", (session_id,))
+
             conn.commit()
 
     return jsonify({"session_id": session_id, "message": "Session ended!"})
+
+
+@session_bp.route('/sessions/<int:session_id>/temp_switch_strategy', methods=['POST'])
+def temp_switch_strategy(session_id):
+    data = request.get_json()
+    new_strategy_id = data.get('strategy_id')
+
+    if not new_strategy_id:
+        return jsonify({"error": "Strategy ID is required"}), 400
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
+            session = cur.fetchone()
+            if not session:
+                return jsonify({"error": "Session not found"}), 404
+
+            # If original_strategy_id is not set, it means we are on the original strategy.
+            # We should save the current strategy before switching.
+            if not session['original_strategy_id']:
+                cur.execute("SELECT strategy_id FROM session_strategies WHERE session_id = %s", (session_id,))
+                rows = cur.fetchall()
+                # Assuming single strategy for now as per "change strategy" flow
+                if rows:
+                    current_strategy_id = rows[0]['strategy_id']
+                    cur.execute("UPDATE session SET original_strategy_id = %s WHERE id = %s", (current_strategy_id, session_id))
+
+            # Update to new strategy
+            cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
+            cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)", (session_id, str(new_strategy_id)))
+
+            # Reset tactic index for the new strategy
+            start_time = datetime.utcnow()
+            cur.execute("""
+                UPDATE session
+                SET current_tactic_index = 0,
+                    current_tactic_started_at = %s
+                WHERE id = %s
+            """, (start_time, session_id))
+
+            conn.commit()
+
+    return jsonify({"success": "Strategy temporarily switched!"}), 200
 
 
 @session_bp.route('/sessions/tactic/next/<int:session_id>', methods=['POST'])
