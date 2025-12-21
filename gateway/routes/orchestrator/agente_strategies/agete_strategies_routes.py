@@ -63,6 +63,8 @@ def orchestrate_validation():
             "tactics": tactics_names,
             "context": article_content
         }
+
+        logging.warning(f"Domain Service retornou erro: {domain_response.status_code}")
         
         try:
             # Envia para o serviço Strategies onde o Gemini processará

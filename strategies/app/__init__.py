@@ -2,10 +2,12 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from dotenv import load_dotenv
 # from flask_socketio import SocketIO
 
 db = SQLAlchemy()
 migrate = Migrate()
+
 # socketio = SocketIO()
 
 def create_app():
@@ -17,6 +19,8 @@ def create_app():
 
     from app.routes.strategies_routes import strategies_bp
     from app.routes.agente_strategies_routes import agente_strategies_bp
+
+    os.e
 
     # Registrar o blueprint
     app.register_blueprint(strategies_bp)

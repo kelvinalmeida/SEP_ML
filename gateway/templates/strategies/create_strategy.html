@@ -94,51 +94,55 @@
                     <label class="form-label">Táticas Escolhidas + Tempo (min)</label>
                     <div id="dropzone" class="dropzone tactic-name"></div>
                 </div>
-
+                
                 <!-- Botão -->
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg">Salvar Estratégia</button>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary btn-lg" onclick="openAgentAnalysis()">
+                        🤖 Validar com Agente IA
+                    </button>    
+                </div>
+
+                <div id="agentModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+                    <div class="card shadow-lg" style="margin: 10% auto; padding: 2rem; width: 50%; max-width: 600px; border-radius: 15px; animation: slideIn 0.3s ease-out;">
+                        <div class="text-center mb-4">
+                            <h3 class="text-primary fw-bold">🤖 Análise do Agente Pedagógico</h3>
+                            <p class="text-muted">Consultando base de conhecimento...</p>
+                        </div>
+                        
+                        <div id="agentLoading" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Lendo artigos e avaliando consistência...</p>
+                        </div>
+    
+                        <div id="agentResult" style="display:none;">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="h5 mb-0">Nota de Qualidade:</span>
+                                <span id="agentGrade" class="display-6 fw-bold">--</span>
+                            </div>
+                            
+                            <div class="alert alert-light border" role="alert">
+                                <strong>Feedback do Especialista:</strong>
+                                <p id="agentFeedback" class="mb-0 mt-2 text-dark">--</p>
+                            </div>
+    
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                                <button type="button" class="btn btn-outline-secondary me-md-2" onclick="closeModal()">
+                                    ✏️ Revisar e Melhorar
+                                </button>
+                                <button type="button" id="btnConfirm" class="btn btn-success" onclick="confirmCreation()" style="display:none;">
+                                    ✅ Aprovar e Salvar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="agentModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-        <div class="card shadow-lg" style="margin: 10% auto; padding: 2rem; width: 50%; max-width: 600px; border-radius: 15px; animation: slideIn 0.3s ease-out;">
-            <div class="text-center mb-4">
-                <h3 class="text-primary fw-bold">🤖 Análise do Agente Pedagógico</h3>
-                <p class="text-muted">Consultando base de conhecimento...</p>
-            </div>
-            
-            <div id="agentLoading" class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Lendo artigos e avaliando consistência...</p>
-            </div>
-
-            <div id="agentResult" style="display:none;">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <span class="h5 mb-0">Nota de Qualidade:</span>
-                    <span id="agentGrade" class="display-6 fw-bold">--</span>
-                </div>
-                
-                <div class="alert alert-light border" role="alert">
-                    <strong>Feedback do Especialista:</strong>
-                    <p id="agentFeedback" class="mb-0 mt-2 text-dark">--</p>
-                </div>
-
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                    <button type="button" class="btn btn-outline-secondary me-md-2" onclick="closeModal()">
-                        ✏️ Revisar e Melhorar
-                    </button>
-                    <button type="button" id="btnConfirm" class="btn btn-success" onclick="confirmCreation()" style="display:none;">
-                        ✅ Aprovar e Salvar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    
 
     
 

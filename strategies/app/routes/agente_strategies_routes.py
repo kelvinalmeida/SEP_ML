@@ -8,64 +8,73 @@ agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
 
 # Configuração da API Key do Gemini
 # NOTA: Em produção, mantenha isso em variáveis de ambiente (os.getenv)
-GEMINI_API_KEY = "AIzaSyAGbueFa52t4bb0LC-ZLIGyLu-LffPs_gY"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAGbueFa52t4bb0LC-ZLIGyLu-LffPs_gY")
+
 genai.configure(api_key=GEMINI_API_KEY)
+
+import os
+import json
+import logging
+from flask import Blueprint, request, jsonify
+from google import genai
+from google.genai import types
+
+agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
+
+# Configuração da API Key
+# Tenta pegar do ambiente (Docker env), ou usa a chave direta como fallback
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAGbueFa52t4bb0LC-ZLIGyLu-LffPs_gY")
 
 @agente_strategies_bp.route('/agent/critique', methods=['POST'])
 def critique_strategy():
     """
-    Agente Worker que atua como um Crítico Pedagógico usando LLM (Gemini).
-    Recebe: A estratégia do usuário e o Contexto (Artigo).
-    Retorna: Uma crítica (Nota e Feedback).
+    Agente Worker: Crítico Pedagógico (Versão Google GenAI SDK v1)
     """
     try:
+        # 1. Extração de dados
         data = request.json
         strategy_name = data.get('name')
-        tactics_list = data.get('tactics', []) # Lista de nomes das táticas
-        reference_article = data.get('context') # O texto vindo do Domain
+        tactics_list = data.get('tactics', [])
+        reference_article = data.get('context')
 
-        # 1. Configuração do Modelo
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 2. Configuração do Cliente (Nova SDK)
+        client = genai.Client(api_key=GEMINI_API_KEY)
 
-        # 2. Construção do Prompt
+        # 3. Construção do Prompt
         prompt = f"""
-        Você é um Especialista Pedagógico Sênior e crítico rigoroso.
-        
-        CONTEXTO DE REFERÊNCIA (Base do conhecimento):
+        Atue como um Especialista Pedagógico.
+        Analise a seguinte estratégia de ensino com base no texto de referência.
+
+        TEXTO DE REFERÊNCIA:
         {reference_article}
-        
+
         ESTRATÉGIA DO PROFESSOR:
         Nome: {strategy_name}
-        Táticas escolhidas: {', '.join(tactics_list)}
-        
-        TAREFA:
-        Analise se as táticas escolhidas pelo professor estão alinhadas com o CONTEXTO DE REFERÊNCIA.
-        Verifique se o método é adequado para o objetivo educacional implícito no texto.
-        
-        SAÍDA OBRIGATÓRIA (JSON puro, sem markdown):
+        Táticas: {', '.join(tactics_list)}
+
+        SAÍDA ESPERADA (JSON):
         {{
-            "grade": <inteiro de 0 a 10>,
-            "feedback": "<texto explicativo curto e direto em português>"
+            "grade": <nota inteira 0-10>,
+            "feedback": "<explicação concisa>"
         }}
         """
 
-        # 3. Chamada ao Gemini
-        response = model.generate_content(prompt)
+        # 4. Chamada ao Modelo
+        # Usando response_mime_type para forçar JSON (funcionalidade do Gemini 1.5+)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash", 
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
+
+        # 5. Tratamento da Resposta
+        # A nova SDK retorna o texto limpo, e como pedimos JSON, podemos fazer o parse direto
+        ai_response = json.loads(response.text)
         
-        # 4. Tratamento da Resposta (Limpeza de Markdown se houver)
-        response_text = response.text.strip()
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        
-        # 5. Parsing do JSON gerado pela IA
-        ai_evaluation = json.loads(response_text)
-        
-        final_score = ai_evaluation.get('grade', 0)
-        final_feedback = ai_evaluation.get('feedback', 'Sem feedback gerado.')
-        
-        # Ajuste de status baseado na nota
+        final_score = ai_response.get('grade', 0)
+        final_feedback = ai_response.get('feedback', 'Sem feedback gerado.')
         status = "approved" if final_score >= 7 else "needs_revision"
 
         return jsonify({
@@ -76,10 +85,8 @@ def critique_strategy():
 
     except Exception as e:
         logging.error(f"Erro no Agente Gemini: {str(e)}")
-        # Fallback caso a IA falhe
         return jsonify({
             "grade": 0, 
-            "feedback": "Erro ao processar a crítica com a IA. Tente novamente.",
-            "status": "error",
-            "details": str(e)
+            "feedback": f"Erro interno na IA: {str(e)}",
+            "status": "error"
         }), 500
