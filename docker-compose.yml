@@ -106,6 +106,8 @@ services:
       - "5003:5003"
     volumes:
       - ./strategies:/app
+    env_file:
+      - ./strategies/config.env
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1

@@ -9,8 +9,7 @@ agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
 
 # Configuração da API Key
 # Tenta pegar do ambiente (Docker env), ou usa a chave direta como fallback
-# GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_API_KEY = current_app.config['GEMINI_API_KEY']
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 
 @agente_strategies_bp.route('/agent/critique', methods=['POST'])
