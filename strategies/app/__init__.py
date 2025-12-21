@@ -1,12 +1,12 @@
-import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from dotenv import load_dotenv
+import os
 # from flask_socketio import SocketIO
 
 db = SQLAlchemy()
 migrate = Migrate()
+
 
 # socketio = SocketIO()
 
@@ -20,12 +20,13 @@ def create_app():
     from app.routes.strategies_routes import strategies_bp
     from app.routes.agente_strategies_routes import agente_strategies_bp
 
-    os.e
+    # colocar a variavel config.env no environment no flask
+
+
 
     # Registrar o blueprint
     app.register_blueprint(strategies_bp)
     app.register_blueprint(agente_strategies_bp)
-
 
     # Inicializar extensões
     db.init_app(app)

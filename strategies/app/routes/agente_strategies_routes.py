@@ -1,21 +1,7 @@
 import os
 import json
 import logging
-import google.generativeai as genai
-from flask import Blueprint, request, jsonify
-
-agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
-
-# Configuração da API Key do Gemini
-# NOTA: Em produção, mantenha isso em variáveis de ambiente (os.getenv)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAGbueFa52t4bb0LC-ZLIGyLu-LffPs_gY")
-
-genai.configure(api_key=GEMINI_API_KEY)
-
-import os
-import json
-import logging
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from google import genai
 from google.genai import types
 
@@ -23,7 +9,9 @@ agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
 
 # Configuração da API Key
 # Tenta pegar do ambiente (Docker env), ou usa a chave direta como fallback
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAGbueFa52t4bb0LC-ZLIGyLu-LffPs_gY")
+# GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = current_app.config['GEMINI_API_KEY']
+
 
 @agente_strategies_bp.route('/agent/critique', methods=['POST'])
 def critique_strategy():
@@ -62,12 +50,14 @@ def critique_strategy():
         # 4. Chamada ao Modelo
         # Usando response_mime_type para forçar JSON (funcionalidade do Gemini 1.5+)
         response = client.models.generate_content(
-            model="gemini-1.5-flash", 
+            model="gemini-2.5-flash", 
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
             )
-        )
+        ) 
+
+        logging.info(f"****************Resposta do Agente Gemini: {response.text}")
 
         # 5. Tratamento da Resposta
         # A nova SDK retorna o texto limpo, e como pedimos JSON, podemos fazer o parse direto
