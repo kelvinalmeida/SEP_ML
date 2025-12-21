@@ -1,57 +1,59 @@
 from flask import Blueprint, request, jsonify
 import requests
-from requests.exceptions import RequestException
 import logging
+import sys
+import os
+from ...services_routs import STRATEGIES_URL, DOMAIN_URL
 
-# Tenta importar as configurações de rotas. 
-# Como este arquivo está em uma subpasta profunda (routes/orchestrator/agentes_strategies),
-# usamos importação absoluta assumindo que o Python Path começa na raiz do 'gateway'.
-try:
-    from routes.services_routs import STRATEGIES_URL, DOMAIN_URL
-except ImportError:
-    # Fallback: Tenta importar subindo os níveis se executado como pacote
-    import sys
-    import os
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
-    from services_routs import STRATEGIES_URL, DOMAIN_URL
+# Importação robusta das variáveis de serviço (STRATEGIES_URL, DOMAIN_URL)
+# Tenta importar relativo, se falhar (devido à profundidade da pasta), ajusta o path.
+# try:
+#     from routes.services_routs import STRATEGIES_URL, DOMAIN_URL
+# except ImportError:
+#     # Adiciona o diretório raiz do gateway ao path
+#     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+#     from services_routs import STRATEGIES_URL, DOMAIN_URL
 
-# Criação do Blueprint
 agete_strategies_bp = Blueprint('agete_strategies_bp', __name__)
 
 @agete_strategies_bp.route('/strategies/orchestrate_validation', methods=['POST'])
 def orchestrate_validation():
     """
-    Age como o Agente Orquestrador.
-    Função:
-    1. Recebe o pedido do Front (Estratégia + Táticas).
-    2. Busca 'Memória' no serviço Domain (Contexto pedagógico).
-    3. Invoca 'Especialista' no serviço Strategies (Agente Crítico).
-    4. Retorna a validação consolidada para o usuário.
+    Agente Orquestrador.
+    Fluxo:
+    1. Recebe dados do Front.
+    2. Busca o conteúdo do Artigo no serviço de Domínio (Memória).
+    3. Envia Artigo + Estratégia para o serviço Strategies (Worker com Gemini).
+    4. Devolve a resposta para o Front.
     """
     try:
         data = request.json
         strategy_name = data.get('name')
-        tactics_names = data.get('tactics', []) # Espera uma lista de nomes de táticas
-        article_id = 1 # Definido estático para o MVP (Padrão Pedagógico)
+        tactics_names = data.get('tactics', [])
+        
+        # ID do artigo fixo para este cenário (Padrão Pedagógico)
+        article_id = 1 
         
         # ---------------------------------------------------------
         # 1. Passo: Buscar Memória (Call Domain Service)
         # ---------------------------------------------------------
         article_content = ""
         try:
-            # O Gateway consulta o serviço de Domínio para pegar o contexto do PDF/RAG
-            domain_response = requests.get(f"{DOMAIN_URL}/get_content/{article_id}", timeout=5)
+            # O Orquestrador pede ao Domain o texto extraído do PDF
+            domain_response = requests.get(f"{DOMAIN_URL}/get_content/1", timeout=10)
             
             if domain_response.status_code == 200:
                 article_content = domain_response.json().get('content', "")
+                if not article_content:
+                    logging.warning("Conteúdo do artigo veio vazio do Domain.")
+                    article_content = "Conteúdo não disponível. Avalie apenas com base nas boas práticas gerais."
             else:
                 logging.warning(f"Domain Service retornou erro: {domain_response.status_code}")
-                article_content = "Conteúdo padrão de referência pedagógica (Fallback: Domínio indisponível)."
+                article_content = "Erro ao recuperar contexto pedagógico. Avalie genericamente."
 
         except Exception as e:
              logging.error(f"Erro ao conectar com Domain: {e}")
-             # Não falha o processo todo, apenas segue com contexto limitado
-             article_content = "Conteúdo padrão (Erro de conexão com Memória)."
+             article_content = "Sistema de memória indisponível."
 
         # ---------------------------------------------------------
         # 2. Passo: Chamar o Agente Worker (Call Strategies Service)
@@ -63,23 +65,23 @@ def orchestrate_validation():
         }
         
         try:
-            # Chama o endpoint do Agente de Estratégia (que deve ser implementado no microsserviço Strategies)
-            agent_response = requests.post(f"{STRATEGIES_URL}/agent/critique", json=worker_payload, timeout=10)
+            # Envia para o serviço Strategies onde o Gemini processará
+            agent_response = requests.post(f"{STRATEGIES_URL}/agent/critique", json=worker_payload, timeout=30)
             
             if agent_response.status_code == 200:
                 return jsonify(agent_response.json())
             else:
                 return jsonify({
                     "grade": 0, 
-                    "feedback": f"O Agente de Estratégia não conseguiu processar. Status: {agent_response.status_code}", 
+                    "feedback": f"O Agente de Estratégia falhou. Código: {agent_response.status_code}", 
                     "status": "error"
                 }), agent_response.status_code
 
-        except RequestException as e:
+        except Exception as e:
             logging.error(f"Erro ao conectar com Strategies Agent: {e}")
             return jsonify({
                 "grade": 0, 
-                "feedback": "Erro de comunicação com o Agente Especialista (Strategies).", 
+                "feedback": "Erro de comunicação com o Agente Especialista.", 
                 "status": "error"
             }), 503
 
