@@ -68,6 +68,15 @@ CREATE TABLE pdf (
         ON DELETE CASCADE
 );
 
+-- Criação da tabela para a Base de Conhecimento do Agente (RAG)
+CREATE TABLE rag_library (
+    id SERIAL PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    path VARCHAR(500) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ==========================================================
 -- 2. DML: POPULAÇÃO DOS DADOS (INSERTS)
 -- ==========================================================
@@ -75,6 +84,15 @@ CREATE TABLE pdf (
 -- ----------------------------------------------------------
 -- DOMÍNIO 1: Fremeworks
 -- ----------------------------------------------------------
+
+-- Inserção do arquivo "Padrão Pedagógico"
+INSERT INTO rag_library (filename, path, description) 
+VALUES (
+    'Padrão Pedagogico-SessaoEnsino-FA_PorT-SBIE2007-LEASPE.pdf', 
+    'domain/app/RAG_arquivos_compartilhados/Padrão Pedagogico-SessaoEnsino-FA_PorT-SBIE2007-LEASPE.pdf',
+    'Artigo sobre estratégias de ensino de IA: recomenda uso de Debate Sincrono para fixação e Reuso de materiais. A nota deve valorizar a interatividade.'
+);
+
 
 INSERT INTO domain (name, description) 
 VALUES ('Fremeworks', 'Como aprender um framework?
