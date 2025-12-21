@@ -96,10 +96,31 @@
                 </div>
 
                 <!-- Botão -->
-                <div class="d-grid">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-secondary btn-lg" id="btn-analyze">Analisar Estratégia</button>
                     <button type="submit" class="btn btn-primary btn-lg">Salvar Estratégia</button>
                 </div>
             </form>
+
+            <!-- Modal de Feedback -->
+            <div class="modal fade" id="feedbackModal" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Análise da Estratégia</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p><strong>Nota:</strong> <span id="feedbackScore"></span>/100</p>
+                    <p><strong>Feedback:</strong></p>
+                    <ul id="feedbackList"></ul>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
         </div>
     </div>
 
@@ -281,7 +302,60 @@
                 }
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
+
+        // Analysis Logic
+        document.getElementById('btn-analyze').addEventListener('click', function() {
+            const name = document.getElementById('name').value;
+            const taticsInputs = document.querySelectorAll('input[name="tatics"]');
+            const timesInputs = document.querySelectorAll('input[name="times"]');
+
+            const tatics = [];
+            for(let i=0; i<taticsInputs.length; i++) {
+                tatics.push({
+                    name: taticsInputs[i].value,
+                    time: timesInputs[i].value
+                });
+            }
+
+            const strategy = {
+                name: name,
+                tactics: tatics
+            };
+
+            fetch('/strategies/orchestrate_validation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(strategy)
+            })
+            .then(r => r.json())
+            .then(data => {
+                const scoreSpan = document.getElementById('feedbackScore');
+                const feedbackList = document.getElementById('feedbackList');
+
+                if (data.score !== undefined) {
+                    scoreSpan.textContent = data.score;
+                    feedbackList.innerHTML = '';
+                    data.feedback.forEach(msg => {
+                        const li = document.createElement('li');
+                        li.textContent = msg;
+                        feedbackList.appendChild(li);
+                    });
+
+                    const modal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+                    modal.show();
+                } else {
+                    alert('Erro ao analisar estratégia: ' + (data.error || 'Erro desconhecido'));
+                }
+            })
+            .catch(err => {
+                console.error("Error analyzing:", err);
+                alert('Erro na comunicação com o servidor.');
+            });
+        });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 
