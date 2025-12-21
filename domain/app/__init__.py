@@ -21,7 +21,11 @@ def create_app():
 
     # Registrar blueprints
     from app.routes.domain_routes import domain_bp
+    from app.routes.agente_domain_routes import agente_domain_bp
+
+
     app.register_blueprint(domain_bp)
+    app.register_blueprint(agente_domain_bp)
 
     app.config['UPLOAD_FOLDER'] = 'uploads/'
 
