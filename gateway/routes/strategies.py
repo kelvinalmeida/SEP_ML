@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect
 from requests.exceptions import RequestException
 import requests
-from .services_routs import STRATEGIES_URL, CONTROL_URL, USER_URL
+from .services_routs import STRATEGIES_URL, CONTROL_URL, USER_URL, DOMAIN_URL
 from app import socketio
 from flask_socketio import join_room, leave_room, send, emit
 from .auth import token_required
@@ -56,6 +56,39 @@ def create_strategy():
     
     return render_template("./strategies/create_strategy.html")
 
+
+@strategy_bp.route('/strategies/orchestrate_validation', methods=['POST'])
+@token_required
+def orchestrate_validation(current_user=None):
+    data = request.json
+    strategy_name = data.get('name')
+    tactics = data.get('tactics', [])
+
+    try:
+        # 1. Pega informações do domínio (Contexto para a IA)
+        # Assumindo que queremos todos os domínios como contexto geral, ou poderíamos filtrar se a UI permitisse seleção.
+        # Aqui pegamos todos para dar um contexto amplo do que está disponível.
+        domain_response = requests.get(f"{DOMAIN_URL}/domains")
+        domains_data = []
+        if domain_response.status_code == 200:
+            domains_data = domain_response.json()
+
+        # 2. Envia para o Worker de Estratégias validar
+        payload = {
+            "name": strategy_name,
+            "tactics": tactics,
+            "domain_context": domains_data
+        }
+
+        worker_response = requests.post(f"{STRATEGIES_URL}/strategies/validate", json=payload)
+
+        if worker_response.status_code == 200:
+            return jsonify(worker_response.json()), 200
+        else:
+            return jsonify({"grade": 0, "feedback": "Erro ao validar estratégia no worker."}), 500
+
+    except RequestException as e:
+        return jsonify({"grade": 0, "feedback": f"Erro de comunicação entre serviços: {str(e)}"}), 503
 
 
 @strategy_bp.route('/strategies', methods=['GET'])

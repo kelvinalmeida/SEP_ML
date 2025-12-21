@@ -63,6 +63,61 @@ def create_strategy():
         return jsonify({"error": str(e)}), 400
 
 
+@strategies_bp.route('/strategies/validate', methods=['POST'])
+def validate_strategy():
+    data = request.json
+    name = data.get('name', '')
+    tactics = data.get('tactics', [])
+    domain_context = data.get('domain_context', []) # Contexto do domínio vindo do Gateway
+
+    # --- SIMULAÇÃO DA IA/WORKER ---
+    # Aqui entraria a chamada para uma LLM (OpenAI, Gemini, Llama, etc)
+    # Como não temos chave configurada, faremos uma análise baseada em regras (Heurística)
+
+    score = 10
+    feedback_points = []
+
+    # 1. Verifica se tem nome
+    if len(name) < 5:
+        score -= 2
+        feedback_points.append("O nome da estratégia é muito curto. Escolha um nome mais descritivo.")
+
+    # 2. Verifica quantidade de táticas
+    if len(tactics) == 0:
+        score = 0
+        feedback_points.append("A estratégia não possui táticas. Adicione pelo menos uma.")
+    elif len(tactics) < 3:
+        score -= 1
+        feedback_points.append("Estratégias com poucas táticas podem ser monótonas. Considere diversificar.")
+
+    # 3. Verifica diversidade (repetição de táticas)
+    unique_tactics = set(tactics)
+    if len(unique_tactics) < len(tactics) * 0.5:
+        score -= 2
+        feedback_points.append("Você está repetindo muitas táticas iguais. Tente variar os estímulos.")
+
+    # 4. Contexto do Domínio
+    # Se houver domínios cadastrados, mas a estratégia não parece citar nada relevante (simplificado)
+    if not domain_context:
+        feedback_points.append("Nenhum domínio encontrado no sistema para cruzar informações. A análise contextual fica limitada.")
+    else:
+        # Exemplo bobo: se tem muitos domínios, elogia.
+        feedback_points.append(f"Análise contextual realizada com base em {len(domain_context)} domínios disponíveis.")
+
+    # Formata feedback final
+    if score < 0: score = 0
+    if score > 10: score = 10
+
+    final_feedback = " ".join(feedback_points)
+    if not final_feedback:
+        final_feedback = "Sua estratégia parece bem estruturada e equilibrada. Bom trabalho!"
+
+    return jsonify({
+        "grade": score,
+        "feedback": final_feedback
+    }), 200
+
+
 # @strategies_bp.route('/strategies', methods=['GET'])
 # def list_strategies():
 #     all_strategies = Strategies.query.all()
