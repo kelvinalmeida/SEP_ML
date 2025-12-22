@@ -76,6 +76,9 @@
                     <input type="text" class="form-control" id="name" name="name" required>
                 </div>
 
+                <!-- Score (Hidden) -->
+                <input type="hidden" name="score" id="scoreInput" value="0">
+
                 <!-- Táticas Disponíveis -->
                 <div class="mb-3">
                     <label class="form-label">Táticas Disponíveis (arraste para baixo)</label>
@@ -195,9 +198,11 @@
                 const gradeElem = document.getElementById('agentGrade');
                 const feedbackElem = document.getElementById('agentFeedback');
                 const btnConfirm = document.getElementById('btnConfirm');
+                const scoreInput = document.getElementById('scoreInput');
 
                 gradeElem.innerText = data.grade + "/10";
                 feedbackElem.innerText = data.feedback;
+                scoreInput.value = data.grade;
 
                 // Lógica de visualização baseada na nota
                 if (data.grade >= 7) {
