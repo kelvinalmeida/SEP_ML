@@ -94,16 +94,144 @@
                     <label class="form-label">Táticas Escolhidas + Tempo (min)</label>
                     <div id="dropzone" class="dropzone tactic-name"></div>
                 </div>
-
+                
                 <!-- Botão -->
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg">Salvar Estratégia</button>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary btn-lg" onclick="openAgentAnalysis()">
+                        🤖 Validar com Agente IA
+                    </button>    
+                </div>
+
+                <div id="agentModal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+                    <div class="card shadow-lg" style="margin: 10% auto; padding: 2rem; width: 50%; max-width: 600px; border-radius: 15px; animation: slideIn 0.3s ease-out;">
+                        <div class="text-center mb-4">
+                            <h3 class="text-primary fw-bold">🤖 Análise do Agente Pedagógico</h3>
+                            <p class="text-muted">Consultando base de conhecimento...</p>
+                        </div>
+                        
+                        <div id="agentLoading" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Lendo artigos e avaliando consistência...</p>
+                        </div>
+    
+                        <div id="agentResult" style="display:none;">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="h5 mb-0">Nota de Qualidade:</span>
+                                <span id="agentGrade" class="display-6 fw-bold">--</span>
+                            </div>
+                            
+                            <div class="alert alert-light border" role="alert">
+                                <strong>Feedback do Especialista:</strong>
+                                <p id="agentFeedback" class="mb-0 mt-2 text-dark">--</p>
+                            </div>
+    
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                                <button type="button" class="btn btn-outline-secondary me-md-2" onclick="closeModal()">
+                                    ✏️ Revisar e Melhorar
+                                </button>
+                                <button type="button" id="btnConfirm" class="btn btn-success" onclick="confirmCreation()" style="display:none;">
+                                    ✅ Aprovar e Salvar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
+    
+
+    
+
     <script>
+
+        // --- NOVA FUNÇÃO: ORQUESTRAÇÃO DO AGENTE ---
+        function openAgentAnalysis() {
+            const nameInput = document.getElementById('name');
+            
+            // 1. Coleta dados da interface
+            const strategyName = nameInput.value;
+            if (!strategyName) {
+                alert("Por favor, dê um nome à estratégia antes de validar.");
+                return;
+            }
+
+            // Pega as táticas que o usuário arrastou para a dropzone
+            const chosenTactics = Array.from(document.querySelectorAll('#dropzone .tactic-label, #dropzone .input-group-text:nth-child(3)'))
+                                    .map(el => el.textContent.trim());
+
+            if (chosenTactics.length === 0) {
+                alert("Adicione pelo menos uma tática.");
+                return;
+            }
+
+            // 2. Abre Modal e Mostra Loading
+            const modal = document.getElementById('agentModal');
+            const loading = document.getElementById('agentLoading');
+            const result = document.getElementById('agentResult');
+            
+            modal.style.display = 'block';
+            loading.style.display = 'block';
+            result.style.display = 'none';
+
+            // 3. Chama o Gateway (Orquestrador)
+            fetch('/strategies/orchestrate_validation', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: strategyName,
+                    tactics: chosenTactics
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 4. Exibe o Resultado do Agente
+                loading.style.display = 'none';
+                result.style.display = 'block';
+
+                const gradeElem = document.getElementById('agentGrade');
+                const feedbackElem = document.getElementById('agentFeedback');
+                const btnConfirm = document.getElementById('btnConfirm');
+
+                gradeElem.innerText = data.grade + "/10";
+                feedbackElem.innerText = data.feedback;
+
+                // Lógica de visualização baseada na nota
+                if (data.grade >= 7) {
+                    gradeElem.className = "display-6 fw-bold text-success";
+                    btnConfirm.style.display = 'inline-block';
+                } else {
+                    gradeElem.className = "display-6 fw-bold text-danger";
+                    // Opcional: Esconder botão de confirmar se a nota for muito baixa para forçar revisão
+                    btnConfirm.style.display = 'inline-block'; // Deixando livre por enquanto
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                loading.style.display = 'none';
+                alert("Erro ao contatar o Agente Pedagógico.");
+                closeModal();
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('agentModal').style.display = 'none';
+        }
+
+        function confirmCreation() {
+            // Envia o formulário real
+            document.querySelector('form').submit();
+        }
+        
+        // --- FIM DA FUNÇÃO DO AGENTE ---
+
+
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
         let availableStrategies = [];
 
         // Fetch strategies on load
