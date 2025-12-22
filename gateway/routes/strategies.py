@@ -18,6 +18,7 @@ def create_strategy():
         tatics = request.form.getlist("tatics")
         times = request.form.getlist("times")
         description = request.form.getlist("description")
+        score = request.form.get("score")
         # return jsonify(name, tatics, times, description)
 
         # Junta tática + tempo
@@ -41,7 +42,7 @@ def create_strategy():
             else:
                 tatics_with_time["chat_id"] = None
         
-        strategy = {"name": name, "tatics": tatics_with_times}
+        strategy = {"name": name, "tatics": tatics_with_times, "score": score}
         # return jsonify(strategy)
         
         try:

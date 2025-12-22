@@ -27,10 +27,11 @@ def create_strategy():
     try:
         name = request.json.get('name')
         raw_tatics = request.json.get('tatics', [])
+        score = request.json.get('score', 0)
 
         # Insert strategy
-        query_strat = "INSERT INTO strategies (name) VALUES (%s) RETURNING id;"
-        cursor.execute(query_strat, (name,))
+        query_strat = "INSERT INTO strategies (name, score) VALUES (%s, %s) RETURNING id;"
+        cursor.execute(query_strat, (name, score))
         strategy_id = cursor.fetchone()['id']
 
         # Insert tactics
@@ -78,7 +79,7 @@ def list_strategies():
 
     try:
         # Seleciona estratégias
-        query = "SELECT id, name FROM strategies;"
+        query = "SELECT id, name, score FROM strategies;"
         cursor.execute(query)
         strategies = cursor.fetchall()
 
@@ -116,7 +117,7 @@ def strategy_by_id(strategy_id):
 
     try:
         # Seleciona a estratégia específica pelo ID
-        query = "SELECT id, name FROM strategies WHERE id = %s"
+        query = "SELECT id, name, score FROM strategies WHERE id = %s"
         cursor.execute(query, (strategy_id,))
         strategy = cursor.fetchone()
 
@@ -437,7 +438,7 @@ def ids_to_names():
         # Cria os placeholders (%s, %s, ...) dinamicamente
         placeholders = ', '.join(['%s'] * len(ids))
         
-        cursor.execute(f"SELECT id, name FROM strategies WHERE id IN ({placeholders})", tuple(ids))
+        cursor.execute(f"SELECT id, name, score FROM strategies WHERE id IN ({placeholders})", tuple(ids))
         strategies = cursor.fetchall()
 
         if not strategies:
@@ -454,7 +455,8 @@ def ids_to_names():
             {
                 "id": s['id'],
                 "name": s['name'],
-                "tatics": s['tatics']
+                "tatics": s['tatics'],
+                "score": s['score']
             } 
             for s in strategies
         ]
