@@ -18,8 +18,27 @@ def create_students():
         email = request.form["email"]
         username = request.form["username"]
         password = request.form["password"]
+        # --- NOVOS CAMPOS ---
+        # Usa .get() para evitar erro caso o campo não venha (embora o 'required' no HTML ajude)
+        pref_content_type = request.form.get("pref_content_type")
+        pref_communication = request.form.get("pref_communication")
+        
+        # Checkbox HTML: Se marcado envia o valor, se desmarcado não envia nada.
+        # Estamos convertendo para booleano Python.
+        pref_receive_email = True if request.form.get("pref_receive_email") == 'true' else False
 
-        student = {"name": name, "age": age, "course": course, "type": type, 'email': email, "username": username, "password": password}
+        student = {
+            "name": name, 
+            "age": age, 
+            "course": course, 
+            "type": type, 
+            'email': email, 
+            "username": username, 
+            "password": password,
+            "pref_content_type": pref_content_type,   # Novo
+            "pref_communication": pref_communication, # Novo
+            "pref_receive_email": pref_receive_email  # Novo
+        }
         
         try:
             all_students_usernames = requests.get(f"{USER_URL}/students/all_students_usernames").json()

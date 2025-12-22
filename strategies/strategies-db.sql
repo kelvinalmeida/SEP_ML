@@ -11,7 +11,8 @@ DROP TABLE IF EXISTS message CASCADE;
 -- Tabela Strategies
 CREATE TABLE strategies (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL
+    name VARCHAR(50) NOT NULL,
+    score INTEGER DEFAULT 0
 );
 
 -- Tabela Message (Necessária para referências de chat)
@@ -69,10 +70,10 @@ CREATE TABLE private_message (
 -- ==========================================================
 
 -- 1. Inserir Strategies
-INSERT INTO strategies (id, name) VALUES 
-(1, 'estra 1'),
-(2, 'estra 2'),
-(3, 'strategia mudandanca de estrategia');
+INSERT INTO strategies (id, name, score) VALUES
+(1, 'estra 1', 8),
+(2, 'estra 2', 7),
+(3, 'strategia mudandanca de estrategia', 9);
 
 -- 2. Inserir Messages (Placeholders para os chats)
 -- Inserimos IDs 1, 2 e 3 pois são usados nas tabelas tactics e general_message

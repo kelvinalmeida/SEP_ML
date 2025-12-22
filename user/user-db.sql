@@ -14,6 +14,10 @@ CREATE TABLE student(
     username VARCHAR(80),
     email VARCHAR(80),
     password_hash VARCHAR(128),
+    -- NOVAS COLUNAS PARA O PERFIL DE APRENDIZADO
+    pref_content_type VARCHAR(50),      -- Ex: 'teoria', 'exemplos', 'exercicios'
+    pref_communication VARCHAR(50),     -- Ex: 'chat', 'video', 'none'
+    pref_receive_email BOOLEAN,         -- Ex: TRUE ou FALSE
     PRIMARY KEY (student_id)
 );
 
@@ -34,9 +38,9 @@ CREATE TABLE teacher(
 -- ==========================================================
 
 -- Inserindo Student (ID 1)
-INSERT INTO student (student_id, name, course, type, age, username, email, password_hash)
+INSERT INTO student (student_id, name, course, type, age, username, email, password_hash, pref_content_type, pref_communication, pref_receive_email)
 OVERRIDING SYSTEM VALUE 
-VALUES (1, 'kelvin', 'CC', 'student', 22, 'kelvin', 'kelvinsantos13@hotmail.com', '88092018');
+VALUES (1, 'kelvin', 'CC', 'student', 22, 'kelvin', 'kelvinsantos13@hotmail.com', '88092018', 'exemplos', 'chat', TRUE);
 
 -- Inserindo Teacher (ID 1)
 INSERT INTO teacher (teacher_id, name, course, type, age, username, email, password_hash)
