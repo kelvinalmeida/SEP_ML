@@ -30,11 +30,27 @@ def create_student():
             email = request.json.get("email")
             username = request.json.get("username")
             password = request.json.get("password")
+
+            # --- NOVOS CAMPOS ---
+            pref_content_type = request.json.get("pref_content_type")
+            pref_communication = request.json.get("pref_communication")
+            pref_receive_email = request.json.get("pref_receive_email")
             
-            add_student_query = """INSERT INTO student (name, age, course, type, email, username, password_hash)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s);"""
+            # Atualiza a Query SQL para incluir as 3 novas colunas
+            add_student_query = """
+                INSERT INTO student (
+                    name, age, course, type, email, username, password_hash,
+                    pref_content_type, pref_communication, pref_receive_email
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            """
             
-            cursor.execute(add_student_query, (name, age, course, type, email, username, password))
+            # Atualiza a tupla de parâmetros com os novos valores no final
+            cursor.execute(add_student_query, (
+                name, age, course, type, email, username, password,
+                pref_content_type, pref_communication, pref_receive_email
+            ))
+            
             conn.commit()
 
             # FIX 2: Fechar cursor e conexão no sucesso
