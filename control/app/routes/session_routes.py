@@ -504,3 +504,27 @@ def change_session_domain(session_id):
             conn.commit()
 
     return jsonify({"success": "Domain changed and session restarted!"}), 200
+
+@session_bp.route('/sessions/tactic/set/<int:session_id>', methods=['POST'])
+def set_tactic(session_id):
+    data = request.get_json()
+    tactic_index = data.get('tactic_index')
+
+    if tactic_index is None:
+        return jsonify({"error": "Tactic index is required"}), 400
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Session not found"}), 404
+
+            now = datetime.utcnow()
+            cur.execute("""
+                UPDATE session
+                SET current_tactic_index = %s, current_tactic_started_at = %s
+                WHERE id = %s
+            """, (tactic_index, now, session_id))
+            conn.commit()
+
+    return jsonify({"success": True, "current_tactic_index": tactic_index})

@@ -77,6 +77,15 @@
                     {% endif %}
                     btn-success btn-lg mb-3">Iniciar Sessão</button>
 
+                     <!-- Autonomous Control Switch -->
+                    <div class="form-check form-switch d-inline-block ms-3
+                    {% if current_user.type != 'teacher'%}
+                        d-none
+                    {% endif %}">
+                        <input class="form-check-input" type="checkbox" role="switch" id="autonomousControlSwitch">
+                        <label class="form-check-label" for="autonomousControlSwitch">Controle Autônomo</label>
+                    </div>
+
                     <div>
                         <h5 id="tacticName" class="text-primary">Aguardando início...</h5>
 
@@ -359,6 +368,55 @@
 
     <script src="{{ url_for('static', filename='js/show_session.js') }}"></script>
 
+    <script>
+        document.getElementById('autonomousControlSwitch').addEventListener('change', function () {
+            if (this.checked) {
+                // Show a toast or alert
+                const toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                toastContainer.innerHTML = `
+                    <div id="agentToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header">
+                            <strong class="me-auto">Agente IA</strong>
+                            <small>Agora</small>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body">
+                            O Agente está processando a decisão da próxima tática...
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(toastContainer);
+                const toastElement = document.getElementById('agentToast');
+                const toast = new bootstrap.Toast(toastElement);
+                toast.show();
+
+                // Trigger POST request
+                fetch(`/session/${window.session_id}/activate_agent_logic`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Agent activated:', data);
+                    if(data.success) {
+                         // Optional: Update UI or notify success
+                    } else {
+                        alert('Erro ao ativar agente: ' + (data.error || 'Unknown error'));
+                        this.checked = false; // Revert switch
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Erro de comunicação com o servidor.');
+                    this.checked = false; // Revert switch
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

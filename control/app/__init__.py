@@ -21,6 +21,8 @@ def create_app():
 
     # Registrar blueprints
     from app.routes.session_routes import session_bp
+    from app.routes.agente_control_routes import agente_control_bp
     app.register_blueprint(session_bp)
+    app.register_blueprint(agente_control_bp)
 
     return app
