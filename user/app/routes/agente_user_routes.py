@@ -26,8 +26,7 @@ def summarize_preferences():
 
     conn = None
     try:
-        # 1. Conexão com o Banco (Direto via driver)
-        # Pega a URL do Config ou da variável de ambiente
+        # 1. Conexão
         db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
         conn = create_connection(db_url)
         
@@ -37,42 +36,44 @@ def summarize_preferences():
         students_data = []
         
         with conn.cursor() as cur:
-            # 2. Query SQL Pura
-            # Usamos o operador ANY(%s) do Postgres que lida muito bem com listas/arrays
-            # Note que usamos 'student_id' conforme seu arquivo user-db.sql
+            # 2. Query SQL Atualizada (Incluindo pref_receive_email)
             query = """
-                SELECT name, pref_content_type, pref_communication 
+                SELECT name, pref_content_type, pref_communication, pref_receive_email
                 FROM student 
                 WHERE student_id = ANY(%s)
             """
             cur.execute(query, (student_ids,))
-            
-            # Como o db.py usa RealDictCursor, isso retorna uma lista de dicionários
             students_data = cur.fetchall()
 
         if not students_data:
             return jsonify({"summary": "Estudantes não encontrados na base de dados."}), 404
 
-        # 3. Formatação do Texto para o Agente
+        # 3. Formatação do Texto (Tratando o Booleano)
         profiles_text = []
         for s in students_data:
-            # Acesso direto às chaves do dicionário retornado pelo banco
             name = s.get('name', 'Aluno')
             p_type = s.get('pref_content_type') or 'Não informado'
             p_comm = s.get('pref_communication') or 'Não informado'
             
-            profiles_text.append(f"- Aluno {name}: Prefere conteúdo '{p_type}' via '{p_comm}'.")
+            # Lógica para o campo booleano
+            recebe_email = s.get('pref_receive_email')
+            txt_email = "Aceita receber emails" if recebe_email else "NÃO aceita emails"
+            
+            profiles_text.append(f"- Aluno {name}: Prefere '{p_type}' via '{p_comm}'. {txt_email}.")
         
         profiles_joined = "\n".join(profiles_text)
 
-        # 4. Chamada ao Gemini (Novo SDK)
+        # return jsonify({"profiles": profiles_joined}), 200
+
+        # 4. Prompt Atualizado
         prompt = f"""
         Atue como um Especialista Pedagógico.
         Analise estas preferências de aprendizado reais recuperadas do banco de dados:
         {profiles_joined}
         
         Gere um resumo curto (máximo 1 parágrafo) sobre o perfil da turma. 
-        Destaque qual tipo de mídia e canal de comunicação é o mais efetivo para a maioria.
+        Destaque qual tipo de mídia e canal é o mais efetivo.
+        IMPORTANTE: Cite explicitamente se o uso de email é viável para a maioria ou se deve ser evitado.
         """
 
         client = genai.Client(api_key=Config.GEMINI_API_KEY)
@@ -90,6 +91,5 @@ def summarize_preferences():
         logging.error(f"Erro no Agente User: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
-        # Importante: Fechar a conexão manual
         if conn:
             conn.close()
