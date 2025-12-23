@@ -41,6 +41,9 @@ CREATE TABLE teacher(
 INSERT INTO student (student_id, name, course, type, age, username, email, password_hash, pref_content_type, pref_communication, pref_receive_email)
 OVERRIDING SYSTEM VALUE 
 VALUES (1, 'kelvin', 'CC', 'student', 22, 'kelvin', 'kelvinsantos13@hotmail.com', '88092018', 'exemplos', 'chat', TRUE);
+VALUES (1, 'kelvin', 'CC', 'student', 22, 'kelvin', 'kelvinsantos13@hotmail.com', '88092018', 'teoria', 'chat', TRUE);
+VALUES (1, 'kelvin', 'CC', 'student', 22, 'kelvin', 'kelvinsantos13@hotmail.com', '88092018', 'chat', 'video', FALSE);
+VALUES (1, 'kelvin', 'CC', 'student', 22, 'kelvin', 'kelvinsantos13@hotmail.com', '88092018', 'exemplos', 'chat', TRUE);
 
 -- Inserindo Teacher (ID 1)
 INSERT INTO teacher (teacher_id, name, course, type, age, username, email, password_hash)
