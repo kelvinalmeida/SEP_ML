@@ -1,16 +1,22 @@
 import logging
+import os
 from flask import Blueprint, request, jsonify
-# ATENÇÃO: Importação do novo SDK
 from google import genai
-from ..models import Student
 from config import Config
+
+# Tentativa de importação relativa ou absoluta do db.py, 
+# seguindo o padrão que você usa no 'control'
+try:
+    from db import create_connection
+except ImportError:
+    from ...db import create_connection
 
 agente_user_bp = Blueprint('agente_user_bp', __name__)
 
 @agente_user_bp.route('/students/summarize_preferences', methods=['POST'])
 def summarize_preferences():
     """
-    Agente User: Recebe IDs, busca no Postgres e resume com Gemini (Novo SDK).
+    Agente User: Recebe IDs, busca via SQL Direto (psycopg2) e resume com Gemini.
     """
     data = request.get_json()
     student_ids = data.get('student_ids', [])
@@ -18,48 +24,72 @@ def summarize_preferences():
     if not student_ids:
         return jsonify({"summary": "Nenhum estudante selecionado."}), 200
 
+    conn = None
     try:
-        # 1. Busca no Postgres (SQLAlchemy)
-        students = Student.query.filter(Student.id.in_(student_ids)).all()
+        # 1. Conexão com o Banco (Direto via driver)
+        # Pega a URL do Config ou da variável de ambiente
+        db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
+        conn = create_connection(db_url)
+        
+        if not conn:
+             return jsonify({"error": "Falha na conexão com o banco de dados"}), 500
 
-        if not students:
-            return jsonify({"summary": "Estudantes não encontrados."}), 404
+        students_data = []
+        
+        with conn.cursor() as cur:
+            # 2. Query SQL Pura
+            # Usamos o operador ANY(%s) do Postgres que lida muito bem com listas/arrays
+            # Note que usamos 'student_id' conforme seu arquivo user-db.sql
+            query = """
+                SELECT name, pref_content_type, pref_communication 
+                FROM student 
+                WHERE student_id = ANY(%s)
+            """
+            cur.execute(query, (student_ids,))
+            
+            # Como o db.py usa RealDictCursor, isso retorna uma lista de dicionários
+            students_data = cur.fetchall()
 
-        # 2. Prepara o texto
+        if not students_data:
+            return jsonify({"summary": "Estudantes não encontrados na base de dados."}), 404
+
+        # 3. Formatação do Texto para o Agente
         profiles_text = []
-        for s in students:
-            # Garanta que o nome do campo 'learning_style' está correto no seu Model
-            pref = getattr(s, 'learning_style', 'Preferência não informada') 
-            profiles_text.append(f"- Aluno {s.name}: {pref}")
+        for s in students_data:
+            # Acesso direto às chaves do dicionário retornado pelo banco
+            name = s.get('name', 'Aluno')
+            p_type = s.get('pref_content_type') or 'Não informado'
+            p_comm = s.get('pref_communication') or 'Não informado'
+            
+            profiles_text.append(f"- Aluno {name}: Prefere conteúdo '{p_type}' via '{p_comm}'.")
         
         profiles_joined = "\n".join(profiles_text)
 
-        # 3. Chamada ao Gemini usando o NOVO SDK (Client)
+        # 4. Chamada ao Gemini (Novo SDK)
         prompt = f"""
         Atue como um Especialista Pedagógico.
-        Analise estas preferências de aprendizado:
+        Analise estas preferências de aprendizado reais recuperadas do banco de dados:
         {profiles_joined}
         
-        Gere um resumo curto (1 parágrafo) sobre o perfil da turma para guiar a aula.
+        Gere um resumo curto (máximo 1 parágrafo) sobre o perfil da turma. 
+        Destaque qual tipo de mídia e canal de comunicação é o mais efetivo para a maioria.
         """
 
-        # Instancia o cliente com a chave do Config
         client = genai.Client(api_key=Config.GEMINI_API_KEY)
-        
-        # Gera o conteúdo
-        # Nota: O modelo 'gemini-2.5-flash' do seu exemplo pode não estar disponível
-        # publicamente para todos ainda. Use 'gemini-1.5-flash' para garantir estabilidade.
         response = client.models.generate_content(
-            model="gemini-1.5-flash", 
+            model="gemini-2.5-flash", 
             contents=prompt
         )
 
         return jsonify({
             "summary": response.text,
-            "student_count": len(students)
+            "student_count": len(students_data)
         }), 200
 
     except Exception as e:
         logging.error(f"Erro no Agente User: {str(e)}")
-        # Tratamento para erros específicos da API (opcional)
         return jsonify({"error": str(e)}), 500
+    finally:
+        # Importante: Fechar a conexão manual
+        if conn:
+            conn.close()
