@@ -23,7 +23,11 @@ def create_strategy():
 
         # Junta tática + tempo
         tatics_with_times = [
-            {"name": tatics[i], "time": float(times[i]), "description": description[i]}
+            {
+                "name": tatics[i],
+                "time": float(times[i]) if times[i] and times[i].strip() else 0.0,
+                "description": description[i]
+            }
             for i in range(len(tatics))
         ]
 
