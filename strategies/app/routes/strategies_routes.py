@@ -86,7 +86,7 @@ def list_strategies():
         # Popula tatics para cada estratégia
         # (N+1 query, mas mantém simplicidade com psycopg2 raw)
         for s in strategies:
-            cursor.execute("SELECT name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (s['id'],))
+            cursor.execute("SELECT id, name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (s['id'],))
             s['tatics'] = cursor.fetchall()
 
         cursor.close()
@@ -122,7 +122,7 @@ def strategy_by_id(strategy_id):
         strategy = cursor.fetchone()
 
         if strategy:
-            cursor.execute("SELECT name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (strategy['id'],))
+            cursor.execute("SELECT id, name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (strategy['id'],))
             strategy['tatics'] = cursor.fetchall()
 
             cursor.close()
@@ -447,7 +447,7 @@ def ids_to_names():
              return jsonify({"error": "No strategies found"}), 404
 
         for s in strategies:
-            cursor.execute("SELECT name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (s['id'],))
+            cursor.execute("SELECT id, name, description, time, chat_id FROM tactics WHERE strategy_id = %s", (s['id'],))
             s['tatics'] = cursor.fetchall()
 
         # Monta o resultado no formato exato que você pediu.
