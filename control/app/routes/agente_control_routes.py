@@ -115,7 +115,7 @@ def agent_session_summary(session_id):
 
         client = genai.Client(api_key=Config.GEMINI_API_KEY)
         response = client.models.generate_content(
-            model="gemini-2.5-flash", 
+            model="gemini-2.5-flash-lite-preview-09-2025", 
             contents=prompt
         )
 
