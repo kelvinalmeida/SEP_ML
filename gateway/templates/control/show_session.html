@@ -71,6 +71,18 @@
                         d-none
                     {% endif %}
                     btn-danger btn-lg mb-3">Encerrar Sessão</button>
+                    <!-- Toggle Switch para Agente (IA) -->
+                    {% if current_user.type == 'teacher' %}
+                    <div class="form-check form-switch d-inline-block text-start mb-3 mx-2">
+                        <input class="form-check-input" type="checkbox" id="agentToggle"
+                            {% if session.status == 'in-progress' %} disabled {% endif %}
+                            {% if session.use_agent %} checked {% endif %}>
+                        <label class="form-check-label text-primary fw-bold" for="agentToggle">
+                            Ativar Agente de Estratégia (IA)
+                        </label>
+                    </div>
+                    {% endif %}
+
                     <button id="startSessionBtn" class="btn 
                     {% if current_user.type != 'teacher'%}
                         d-none

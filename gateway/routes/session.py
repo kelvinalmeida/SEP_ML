@@ -196,18 +196,18 @@ def get_session_status(session_id, current_user=None):
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
 
-@session_bp.route('/sessions/start/<int:session_id>', methods=['GET'])
+@session_bp.route('/sessions/start/<int:session_id>', methods=['GET', 'POST'])
 @token_required
 def start_session(session_id, current_user=None):
     try:
-        # --- REMOVIDO/COMENTADO O BLOQUEIO ---
-        # A verificação abaixo impedia reiniciar sessões travadas
-        # session_status = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}").json()
-        # if(session_status["status"] == "in-progress"):
-        #     return jsonify({"error": "Session already in progress"}), 400
+        # Pega dados se for POST (ex: use_agent)
+        data = {}
+        if request.method == 'POST' and request.is_json:
+             data = request.get_json()
         
         # O Control Service já sabe reiniciar (zerar o índice) quando recebe o comando start
-        response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
+        # Repassa o payload (use_agent) para o Control
+        response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}", json=data)
         
         # Verifica se o JSON existe antes de retornar
         try:
@@ -241,6 +241,118 @@ def next_tactic(session_id, current_user=None):
          return jsonify({"error": "Unauthorized"}), 403
 
     try:
+        # 0. Verifica se o Agente de Estratégia está ativo
+        session_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
+        if session_res.status_code != 200:
+            return jsonify({"error": "Failed to fetch session details"}), 500
+
+        session_json = session_res.json()
+        use_agent = session_json.get("use_agent", False)
+
+        if use_agent:
+            # === FLUXO DE AGENTE DE IA ===
+            logging.info("🤖 Agente de Estratégia ATIVADO. Iniciando ciclo de decisão...")
+
+            # 1. Dados da Sessão (Control)
+            strategy_id = session_json.get('strategies', [None])[0]
+
+            # Precisamos dos IDs executados. O Control não retorna isso direto no GET /sessions/{id}.
+            # O Control retorna current_tactic_index. Mas precisamos da lista de IDs anteriores?
+            # A lógica atual do Control é baseada em índice.
+            # O Agente precisa saber QUAIS táticas foram feitas.
+            # Podemos inferir isso pegando todas as táticas da estratégia ATÉ o índice atual.
+
+            executed_ids = []
+            if strategy_id:
+                strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
+                if strat_res.status_code == 200:
+                    strat_data = strat_res.json()
+                    tactics = strat_data.get('tatics', [])
+                    # Assume que todas até o índice atual foram executadas
+                    # Nota: O índice atual ainda aponta para a "anterior" (que acabou de acabar) ou a "corrente"?
+                    # Quando chamamos Next, queremos DECIDIR a próxima.
+                    # As executadas são de 0 até current_tactic_index.
+                    current_idx = session_json.get('current_tactic_index', 0)
+                    for i in range(current_idx + 1): # Inclui a atual que está terminando
+                         if i < len(tactics):
+                             executed_ids.append(tactics[i]['id'])
+
+            performance_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}/agent_summary")
+            performance_summary = performance_res.json().get('summary', 'Sem dados de performance.') if performance_res.status_code == 200 else 'Erro ao buscar performance.'
+
+            # 2. Dados do Aluno/Turma (User)
+            student_ids = session_json.get('students', [])
+            student_profile_summary = "Sem alunos."
+            if student_ids:
+                 user_res = requests.post(f"{USER_URL}/students/summarize_preferences", json={"student_ids": student_ids})
+                 if user_res.status_code == 200:
+                     student_profile_summary = user_res.json().get('summary', 'Perfil não informado.')
+
+            # 3. Conteúdo do Domínio (Domain)
+            # MVP: Fixo ID=2 para conteúdo, mas dinâmico para metadados
+            domain_id = session_json.get('domains', [None])[0]
+            domain_name = "Domínio Desconhecido"
+            domain_description = ""
+
+            if domain_id:
+                 dom_res = requests.get(f"{DOMAIN_URL}/domains/{domain_id}")
+                 if dom_res.status_code == 200:
+                     d_data = dom_res.json()
+                     domain_name = d_data.get('name', '')
+                     domain_description = d_data.get('description', '')
+
+            # Conteúdo fixo ID 2
+            content_res = requests.get(f"{DOMAIN_URL}/get_content/2") # MVP
+            article_text = content_res.json().get('content', '') if content_res.status_code == 200 else ''
+
+            # 4. Chamada ao Agente (Strategies)
+            agent_payload = {
+                "strategy_id": strategy_id,
+                "executed_tactics": executed_ids,
+                "student_profile_summary": student_profile_summary,
+                "performance_summary": performance_summary,
+                "domain_name": domain_name,
+                "domain_description": domain_description,
+                "article_text": article_text
+            }
+
+            logging.info(f"📤 Enviando payload para Agente: {agent_payload.keys()}")
+            agent_res = requests.post(f"{STRATEGIES_URL}/agent/decide_next_tactic", json=agent_payload)
+
+            if agent_res.status_code == 200:
+                decision = agent_res.json().get('decision', {})
+                chosen_tactic_id = decision.get('chosen_tactic_id')
+
+                logging.info(f"📥 Decisão do Agente: Tática ID {chosen_tactic_id}")
+
+                # 5. Aplicar Decisão (Encontrar índice e setar)
+                if chosen_tactic_id and strategy_id:
+                     # Buscar táticas para achar o índice
+                     strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
+                     if strat_res.status_code == 200:
+                         tactics = strat_res.json().get('tatics', [])
+                         target_index = -1
+                         for idx, t in enumerate(tactics):
+                             if t['id'] == chosen_tactic_id:
+                                 target_index = idx
+                                 break
+
+                         if target_index != -1:
+                             # Seta o índice no Control
+                             requests.post(f"{CONTROL_URL}/sessions/tactic/set/{session_id}", json={'tactic_index': target_index})
+                             logging.info(f"✅ Índice da tática atualizado para {target_index}")
+
+                             # Como já atualizamos, retornamos sucesso. O frontend vai dar reload/refresh.
+                             return jsonify({"success": True, "agent_decision": decision}), 200
+                         else:
+                             logging.error("❌ Tática escolhida pelo agente não encontrada na estratégia atual.")
+            else:
+                 logging.error(f"❌ Falha no Agente Strategies: {agent_res.text}")
+
+            # Se falhar o agente, cai para o fluxo normal (fallback)
+
+        # === FLUXO NORMAL (LINEAR) ===
+
         # 1. Avança a tática no Microserviço de Controle
         response = requests.post(f"{CONTROL_URL}/sessions/tactic/next/{session_id}")
         if response.status_code != 200:
