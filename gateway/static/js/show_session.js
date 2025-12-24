@@ -576,12 +576,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // Inicia a sessão ao clicar
     document.getElementById("startSessionBtn").addEventListener("click", () => {
         console.log("Iniciando a sessão", session_id);
-        fetch(`/sessions/start/${session_id}`)
+
+        const agentToggle = document.getElementById("agentToggle");
+        const useAgent = agentToggle ? agentToggle.checked : false;
+
+        fetch(`/sessions/start/${session_id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ use_agent: useAgent })
+        })
             .then(response => {
                 console.log(response);
                 if (response.ok) {
                     // console.log(response)
                     fetchCurrentTactic(session_id);
+                    // Disable toggle after start
+                    if(agentToggle) agentToggle.disabled = true;
                 } else {
                     alert("Sessão já iniciada ou erro ao iniciar.");
                 }
@@ -630,16 +642,63 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    function showThinking() {
+        const thinkingDiv = document.getElementById("agentThinking");
+        if(thinkingDiv) {
+            thinkingDiv.classList.remove("d-none");
+        }
+
+        const reasoningContainer = document.getElementById("agentReasoningContainer");
+        if(reasoningContainer) reasoningContainer.innerHTML = "";
+    }
+
+    function hideThinking() {
+        const thinkingDiv = document.getElementById("agentThinking");
+        if(thinkingDiv) thinkingDiv.classList.add("d-none");
+    }
+
+    function showReasoning(agent_decision) {
+        if (agent_decision && agent_decision.reasoning) {
+            const container = document.getElementById("agentReasoningContainer");
+            if (container) {
+                container.innerHTML = `
+                    <div class="agent-reasoning-card">
+                        <h5 class="text-primary"><i class="bi bi-robot"></i> Motivo da Escolha (IA)</h5>
+                        <p>${agent_decision.reasoning}</p>
+                    </div>
+                `;
+            }
+        }
+    }
+
     const nextBtn = document.getElementById("nextTacticBtn");
     if(nextBtn){
         nextBtn.addEventListener("click", () => {
+             // Mostra spinner se o agente estiver ativo (checamos a toggle se possível, ou sempre mostramos e escondemos rápido se não for)
+             // A toggle pode estar desabilitada mas checked.
+             const agentToggle = document.getElementById("agentToggle");
+
+             if (agentToggle && agentToggle.checked) {
+                 showThinking();
+             }
+
              fetch(`/sessions/${session_id}/next_tactic`, { method: 'POST' })
              .then(response => {
+                 hideThinking();
                  if(response.ok) {
-                    fetchCurrentTactic(session_id);
+                    response.json().then(data => {
+                        if (data.agent_decision) {
+                            showReasoning(data.agent_decision);
+                        }
+                        fetchCurrentTactic(session_id);
+                    });
                  } else {
                      console.error("Erro ao avançar tática");
                  }
+             })
+             .catch(err => {
+                 hideThinking();
+                 console.error(err);
              });
         });
     }

@@ -57,7 +57,7 @@ def critique_strategy():
         # 4. Chamada ao Modelo
         # Usando response_mime_type para forçar JSON (funcionalidade do Gemini 1.5+)
         response = client.models.generate_content(
-            model="gemini-2.5-flash", 
+            model="gemini-2.5-flash-lite-preview-09-2025", 
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
@@ -219,7 +219,7 @@ def decide_next_tactic():
 
         client = genai.Client(api_key=Config.GEMINI_API_KEY)
         response = client.models.generate_content(
-            model="gemini-2.5-flash", 
+            model="gemini-2.5-flash-lite-preview-09-2025", 
             contents=prompt,
             config={'response_mime_type': 'application/json'}
         )

@@ -10,6 +10,7 @@ import requests
 from .auth import token_required
 from datetime import datetime
 from .services_routs import CONTROL_URL, STRATEGIES_URL, USER_URL, DOMAIN_URL
+from .orchestrator.agente_control.agente_control_routes import execute_agent_logic
 
 session_bp = Blueprint("session", __name__)
 
@@ -196,18 +197,18 @@ def get_session_status(session_id, current_user=None):
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
 
-@session_bp.route('/sessions/start/<int:session_id>', methods=['GET'])
+@session_bp.route('/sessions/start/<int:session_id>', methods=['GET', 'POST'])
 @token_required
 def start_session(session_id, current_user=None):
     try:
-        # --- REMOVIDO/COMENTADO O BLOQUEIO ---
-        # A verificação abaixo impedia reiniciar sessões travadas
-        # session_status = requests.get(f"{CONTROL_URL}/sessions/status/{session_id}").json()
-        # if(session_status["status"] == "in-progress"):
-        #     return jsonify({"error": "Session already in progress"}), 400
+        # Pega dados se for POST (ex: use_agent)
+        data = {}
+        if request.method == 'POST' and request.is_json:
+             data = request.get_json()
         
         # O Control Service já sabe reiniciar (zerar o índice) quando recebe o comando start
-        response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}")
+        # Repassa o payload (use_agent) para o Control
+        response = requests.post(f"{CONTROL_URL}/sessions/start/{session_id}", json=data)
         
         # Verifica se o JSON existe antes de retornar
         try:
@@ -241,6 +242,22 @@ def next_tactic(session_id, current_user=None):
          return jsonify({"error": "Unauthorized"}), 403
 
     try:
+        # 0. Verifica se o Agente de Estratégia está ativo
+        session_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
+        if session_res.status_code != 200:
+            return jsonify({"error": "Failed to fetch session details"}), 500
+
+        session_json = session_res.json()
+        use_agent = session_json.get("use_agent", False)
+
+        if use_agent:
+            # Chama o Orquestrador refatorado
+            agent_response = execute_agent_logic(session_id, session_json)
+            if agent_response:
+                return agent_response
+
+        # === FLUXO NORMAL (LINEAR) ===
+
         # 1. Avança a tática no Microserviço de Controle
         response = requests.post(f"{CONTROL_URL}/sessions/tactic/next/{session_id}")
         if response.status_code != 200:
