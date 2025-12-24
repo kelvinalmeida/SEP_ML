@@ -18,7 +18,8 @@ CREATE TABLE session (
     start_time TIMESTAMP,
     current_tactic_index INTEGER DEFAULT 0,
     current_tactic_started_at TIMESTAMP,
-    original_strategy_id VARCHAR(50)
+    original_strategy_id VARCHAR(50),
+    use_agent BOOLEAN DEFAULT FALSE
 );
 
 -- Tabelas normalizadas (Relacionamentos)
@@ -82,11 +83,11 @@ CREATE TABLE verified_answers (
 -- ==========================================================
 
 -- Inserindo Sessões
-INSERT INTO session (status, code, start_time, current_tactic_index, current_tactic_started_at, original_strategy_id) 
+INSERT INTO session (status, code, start_time, current_tactic_index, current_tactic_started_at, original_strategy_id, use_agent)
 VALUES
-('aguardando',  'CODE1234', NULL, 0, NULL, NULL),
-('in-progress', 'LIVE5678', NOW(), 1, NOW(), NULL),
-('finished',    'DONE9012', NOW() - INTERVAL '2 hour', 5, NOW() - INTERVAL '1 hour', NULL);
+('aguardando',  'CODE1234', NULL, 0, NULL, NULL, FALSE),
+('in-progress', 'LIVE5678', NOW(), 1, NOW(), NULL, FALSE),
+('finished',    'DONE9012', NOW() - INTERVAL '2 hour', 5, NOW() - INTERVAL '1 hour', NULL, FALSE);
 
 -- Vinculando Estratégias
 INSERT INTO session_strategies (session_id, strategy_id) VALUES

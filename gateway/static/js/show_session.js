@@ -576,12 +576,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // Inicia a sessão ao clicar
     document.getElementById("startSessionBtn").addEventListener("click", () => {
         console.log("Iniciando a sessão", session_id);
-        fetch(`/sessions/start/${session_id}`)
+
+        const agentToggle = document.getElementById("agentToggle");
+        const useAgent = agentToggle ? agentToggle.checked : false;
+
+        fetch(`/sessions/start/${session_id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ use_agent: useAgent })
+        })
             .then(response => {
                 console.log(response);
                 if (response.ok) {
                     // console.log(response)
                     fetchCurrentTactic(session_id);
+                    // Disable toggle after start
+                    if(agentToggle) agentToggle.disabled = true;
                 } else {
                     alert("Sessão já iniciada ou erro ao iniciar.");
                 }
