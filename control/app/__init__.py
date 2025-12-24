@@ -1,10 +1,9 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 
 db = SQLAlchemy()
-migrate = Migrate()
+# migrate = Migrate()
 
 def create_app():
     app = Flask(__name__, instance_relative_config=True)
@@ -15,12 +14,14 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 
-    # Inicializar extensões
+    # # Inicializar extensões
     db.init_app(app)
-    migrate.init_app(app, db)
+    # migrate.init_app(app, db)
 
     # Registrar blueprints
     from app.routes.session_routes import session_bp
+    from app.routes.agente_control_routes import agente_control_bp
     app.register_blueprint(session_bp)
+    app.register_blueprint(agente_control_bp)
 
     return app

@@ -91,6 +91,11 @@ VALUES (
     'Padrão Pedagogico-SessaoEnsino-FA_PorT-SBIE2007-LEASPE.pdf', 
     'domain/app/RAG_arquivos_compartilhados/Padrão Pedagogico-SessaoEnsino-FA_PorT-SBIE2007-LEASPE.pdf',
     'Artigo sobre estratégias de ensino de IA: recomenda uso de Debate Sincrono para fixação e Reuso de materiais. A nota deve valorizar a interatividade.'
+),
+(
+    'Execucao de uma Sessao de Ensino.pdf', 
+    'domain/app/RAG_arquivos_compartilhados/Execucao de uma Sessao de Ensino.pdf',
+    'Uma sessão de ensino contem uma estratégia e cada estratégia é composta de varias táticas.'
 );
 
 
