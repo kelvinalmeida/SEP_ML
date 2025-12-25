@@ -678,10 +678,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (agent_decision && agent_decision.reasoning) {
             const container = document.getElementById("agentReasoningContainer");
             if (container) {
+                // Novo HTML estruturado
                 container.innerHTML = `
                     <div class="agent-reasoning-card">
-                        <h5 class="text-primary"><i class="bi bi-robot"></i> Motivo da Escolha (IA)</h5>
-                        <p>${agent_decision.reasoning}</p>
+                        <div class="reasoning-header">
+                            <i class="bi bi-lightbulb-fill text-warning"></i>
+                            <span>Decisão do Agente de Estratégia</span>
+                        </div>
+                        <div class="reasoning-content">
+                            ${agent_decision.reasoning}
+                        </div>
+                        <div class="mt-2 text-end">
+                            <span class="badge bg-light text-dark border">Tática Escolhida: ${agent_decision.tactic_name || 'Automática'}</span>
+                        </div>
                     </div>
                 `;
             }
