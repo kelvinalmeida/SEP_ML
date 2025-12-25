@@ -1,6 +1,7 @@
 
 import requests
 import logging
+import re
 from flask import jsonify
 from ...services_routs import CONTROL_URL, STRATEGIES_URL, USER_URL, DOMAIN_URL
 
@@ -92,6 +93,32 @@ def execute_agent_logic(session_id, session_json):
                          # Seta o índice no Control
                          requests.post(f"{CONTROL_URL}/sessions/tactic/set/{session_id}", json={'tactic_index': target_index})
                          logging.info(f"✅ Índice da tática atualizado para {target_index}")
+
+                         # --- VERIFICAÇÃO DE MUDANÇA DE ESTRATÉGIA ---
+                         current_tactic = tactics[target_index]
+                         tactic_name = current_tactic.get('name', '').strip().lower()
+                         valid_names = ["mudanca de estrategia", "mudança de estratégia", "mudança de estrategia", "mudanca de estratégia"]
+
+                         if tactic_name in valid_names:
+                             description = str(current_tactic.get('description', ''))
+                             match = re.search(r'\d+', description)
+
+                             if match:
+                                 target_strategy_id = int(match.group())
+                                 logging.info(f"🔄 Agente escolheu MUDANÇA DE ESTRATÉGIA para ID: {target_strategy_id}")
+
+                                 # Aciona a troca temporária
+                                 switch_res = requests.post(
+                                     f"{CONTROL_URL}/sessions/{session_id}/temp_switch_strategy",
+                                     json={'strategy_id': target_strategy_id}
+                                 )
+
+                                 if switch_res.status_code != 200:
+                                     logging.error(f"❌ Falha ao trocar estratégia (Agente): {switch_res.text}")
+                                 else:
+                                     logging.info("✅ Estratégia trocada com sucesso pelo Agente.")
+                             else:
+                                 logging.warning(f"⚠️ Tática de mudança escolhida, mas sem ID na descrição: {description}")
 
                          return jsonify({"success": True, "agent_decision": decision}), 200
                      else:
