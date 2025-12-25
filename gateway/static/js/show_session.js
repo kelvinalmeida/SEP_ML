@@ -114,13 +114,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (nextBtn && !nextBtn.classList.contains("d-none")) {
                     console.log("Tempo esgotado. Avançando para a próxima tática/estratégia...");
                     
+                    const agentToggle = document.getElementById("agentToggle");
+                    if (agentToggle && agentToggle.checked) {
+                        showThinking();
+                    }
+
                     // Chama a rota de avançar
                     fetch(`/sessions/${session_id}/next_tactic`, { method: 'POST' })
                     .then(response => {
+                        hideThinking();
                         if(response.ok) {
-                            // Atualiza a tela (vai detectar a troca de estratégia se houver)
-                            fetchCurrentTactic(session_id);
+                            response.json().then(data => {
+                                if (data.agent_decision) {
+                                    showReasoning(data.agent_decision);
+                                    sessionStorage.setItem("latestReasoning_" + session_id, JSON.stringify(data.agent_decision));
+                                }
+                                fetchCurrentTactic(session_id);
+                            });
                         }
+                    })
+                    .catch(err => {
+                        hideThinking();
                     });
                 } else {
                     // Se for aluno, apenas atualiza para ver se o professor mudou
@@ -650,6 +664,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const reasoningContainer = document.getElementById("agentReasoningContainer");
         if(reasoningContainer) reasoningContainer.innerHTML = "";
+
+        // Clear saved reasoning when starting new thought process
+        sessionStorage.removeItem("latestReasoning_" + session_id);
     }
 
     function hideThinking() {
@@ -689,6 +706,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     response.json().then(data => {
                         if (data.agent_decision) {
                             showReasoning(data.agent_decision);
+                            sessionStorage.setItem("latestReasoning_" + session_id, JSON.stringify(data.agent_decision));
                         }
                         fetchCurrentTactic(session_id);
                     });
