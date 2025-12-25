@@ -36,8 +36,11 @@
                             <div class="me-3">
                                 <strong>{{ tatic.name }}</strong><br>
                                 <small class="text-muted">
-                                    {{ 'Descrição: ' + (tatic.description if tatic.description != 'hidden' else 'Sem
-                                    descrição') }}
+                                    {% if tatic.description and tatic.description != 'hidden' %}
+                                        Descrição: {{ tatic.description }}
+                                    {% else %}
+                                        Sem descrição
+                                    {% endif %}
                                 </small>
                             </div>
                             <span class="badge bg-primary rounded-pill mt-2">{{ tatic.time }} min</span>
