@@ -3,6 +3,7 @@ import json
 import logging
 from flask import Blueprint, request, jsonify, current_app
 from config import Config
+from openai import OpenAI
 from google import genai
 from google.genai import types
 
@@ -234,6 +235,133 @@ def decide_next_tactic():
 
     except Exception as e:
         logging.error(f"Erro no Agente Strategies: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+
+
+
+@agente_strategies_bp.route('/agent/decide_reuse_logic', methods=['POST'])
+def decide_reuse_logic():
+    """
+    Agente de Estratégia (Lógica de Reuso):
+    Analisa se a turma absorveu o conteúdo.
+    - Se DESEMPENHO BAIXO: Sugere repetir uma tática anterior (Reuso/Reforço).
+    - Se DESEMPENHO ALTO: Sugere avançar para uma nova Estratégia do banco.
+    """
+    data = request.get_json()
+
+    # --- 1. Extração do Contexto (Vindo do Orquestrador) ---
+    # Resumo do Control (Notas e Status)
+    performance_summary = data.get('performance_summary', 'Sem dados de performance.')
+    
+    # Resumo do User (Preferências)
+    student_profile = data.get('student_profile_summary', 'Perfil desconhecido.')
+    
+    # Conteúdo do Domain (O que foi ensinado)
+    domain_content = data.get('article_text', '')[:1000] # Limita caracteres para não estourar contexto
+    
+    # Histórico (O que já foi feito)
+    current_strategy_id = data.get('strategy_id')
+    executed_tactics_ids = data.get('executed_tactics', [])
+
+    conn = None
+    try:
+        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+        conn = create_connection(db_url)
+        
+        if not conn:
+            return jsonify({"error": "Falha na conexão com o banco"}), 500
+
+        with conn.cursor() as cur:
+            # A. Busca nomes das táticas já executadas (Para sugerir repetição se necessário)
+            executed_names = []
+            if executed_tactics_ids:
+                cur.execute("SELECT id, name FROM tactics WHERE id = ANY(%s)", (executed_tactics_ids,))
+                rows = cur.fetchall()
+                for r in rows:
+                    # Ajuste conforme retorno (Dict ou Tupla)
+                    r_id = r['id'] if isinstance(r, dict) else r[0]
+                    r_name = r['name'] if isinstance(r, dict) else r[1]
+                    executed_names.append(f"{r_name} (ID {r_id})")
+
+            # B. Busca OUTRAS Estratégias disponíveis no banco (Para sugerir mudança)
+            # Excluindo a estratégia atual para não sugerir "mudar para o que já estou"
+            cur.execute("SELECT id, name FROM strategies WHERE id != %s", (int(current_strategy_id),))
+            strat_rows = cur.fetchall()
+            available_strategies = []
+            for r in strat_rows:
+                s_id = r['id'] if isinstance(r, dict) else r[0]
+                s_name = r['name'] if isinstance(r, dict) else r[1]
+                available_strategies.append(f"Estratégia: {s_name} (ID {s_id})")
+
+        # --- 2. Configuração do Cliente Groq ---
+        if not Config.GROQ_API_KEY:
+             return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
+
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
+        )
+
+        # --- 3. Construção do Prompt (Engenharia de Decisão) ---
+        prompt = f"""
+        Você é um Especialista em Adaptação Pedagógica (Agente de Reuso).
+        Sua função é analisar o final de um ciclo de ensino e decidir o próximo passo.
+
+        === DADOS DA TURMA ===
+        Perfil: {student_profile}
+        Desempenho na Sessão: {performance_summary}
+        
+        === CONTEXTO DO CONTEÚDO ===
+        Trecho do Material: {domain_content}...
+
+        === OPÇÕES DE AÇÃO ===
+        1. REPETIR TÁTICA (Reforço):
+           Use esta opção se o desempenho for fraco, confuso ou abaixo da média.
+           Táticas que podem ser repetidas: {', '.join(executed_names)}
+        
+        2. MUDAR DE ESTRATÉGIA (Avançar):
+           Use esta opção se o desempenho for bom/suficiente e a turma estiver pronta para algo novo.
+           Outras estratégias disponíveis: {', '.join(available_strategies)}
+
+        === OBJETIVO ===
+        Analise os dados. Se a turma aprendeu, avance. Se não, repita.
+        
+        === SAÍDA ESPERADA (JSON) ===
+        Responda APENAS um JSON neste formato:
+        {{
+            "decision": "REUSE" ou "CHANGE_STRATEGY",
+            "target_id": <ID_DA_TATICA_PARA_REPETIR ou ID_DA_NOVA_ESTRATEGIA>,
+            "target_name": "<Nome da Tática ou Estratégia>",
+            "reasoning": "<Explicação curta baseada nas notas e perfil>"
+        }}
+        """
+
+        # --- 4. Chamada ao Modelo (Groq / Llama 3) ---
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile", # Modelo rápido e inteligente da Groq
+            messages=[
+                {"role": "system", "content": "Responda sempre em JSON válido."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1 # Baixa temperatura para decisão lógica
+        )
+
+        content_text = response.choices[0].message.content
+        decision_json = json.loads(content_text)
+
+        return jsonify({
+            "success": True,
+            "analysis": decision_json
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Erro no Agente Strategies (Reuse): {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
