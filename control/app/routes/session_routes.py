@@ -79,6 +79,54 @@ def get_session_details(conn, session_id):
 
         return session_dict
 
+def ensure_end_flag_column(conn):
+    with conn.cursor() as cur:
+        try:
+            # Check if column exists to avoid error spam in logs (though IF NOT EXISTS handles it)
+            # Just run the ALTER command, if it fails due to existing, it's fine.
+            # Postgres supports IF NOT EXISTS for ADD COLUMN in newer versions (9.6+)
+            cur.execute("ALTER TABLE session ADD COLUMN IF NOT EXISTS end_on_next_completion BOOLEAN DEFAULT FALSE")
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            # Ignore duplicate column errors or just log
+            logging.warning(f"Note on ensure_end_flag_column: {e}")
+
+def _end_session(conn, session_id):
+    """
+    Helper to end the session logic, allowing reuse.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
+        session = cur.fetchone()
+        if not session:
+            return False
+
+        # Revert to original strategy if it was changed
+        if session.get('original_strategy_id'):
+            original_strategy_id = session['original_strategy_id']
+            # Revert session_strategies
+            cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
+            cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
+                       (session_id, str(original_strategy_id)))
+
+            # Clear the original_strategy_id column
+            cur.execute("UPDATE session SET status = 'finished', original_strategy_id = NULL WHERE id = %s", (session_id,))
+        else:
+            cur.execute("UPDATE session SET status = 'finished' WHERE id = %s", (session_id,))
+
+        conn.commit()
+    return True
+
+@session_bp.route('/sessions/<int:session_id>/set_end_flag', methods=['POST'])
+def set_end_flag(session_id):
+    with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
+        with conn.cursor() as cur:
+             cur.execute("UPDATE session SET end_on_next_completion = TRUE WHERE id = %s", (session_id,))
+             conn.commit()
+    return jsonify({"success": True}), 200
+
 @session_bp.route('/sessions/create', methods=['POST'])
 def create_session():
     data = request.get_json()
@@ -212,26 +260,9 @@ def start_session(session_id):
 @session_bp.route('/sessions/end/<int:session_id>', methods=['POST'])
 def end_session(session_id):
     with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
-            session = cur.fetchone()
-            if not session:
-                return jsonify({"error": "Session not found"}), 404
-
-            # Revert to original strategy if it was changed
-            if session['original_strategy_id']:
-                original_strategy_id = session['original_strategy_id']
-                # Revert session_strategies
-                cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
-                cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
-                           (session_id, str(original_strategy_id)))
-
-                # Clear the original_strategy_id column
-                cur.execute("UPDATE session SET status = 'finished', original_strategy_id = NULL WHERE id = %s", (session_id,))
-            else:
-                cur.execute("UPDATE session SET status = 'finished' WHERE id = %s", (session_id,))
-
-            conn.commit()
+        success = _end_session(conn, session_id)
+        if not success:
+             return jsonify({"error": "Session not found"}), 404
 
     return jsonify({"session_id": session_id, "message": "Session ended!"})
 
@@ -282,6 +313,22 @@ def temp_switch_strategy(session_id):
 @session_bp.route('/sessions/tactic/next/<int:session_id>', methods=['POST'])
 def next_tactic(session_id):
     with get_db_connection() as conn:
+        # Check for end_on_next_completion flag
+        end_flag = False
+        with conn.cursor() as cur:
+            try:
+                cur.execute("SELECT end_on_next_completion FROM session WHERE id = %s", (session_id,))
+                res = cur.fetchone()
+                if res and res.get('end_on_next_completion'):
+                    end_flag = True
+            except Exception:
+                # Column likely missing, ignore
+                conn.rollback()
+
+        if end_flag:
+            _end_session(conn, session_id)
+            return jsonify({"success": True, "session_status": "finished", "message": "Session ended by rule."})
+
         with conn.cursor() as cur:
             cur.execute("SELECT id, current_tactic_index FROM session WHERE id = %s", (session_id,))
             session = cur.fetchone()
