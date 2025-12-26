@@ -32,10 +32,18 @@ def execute_agent_logic(session_id, session_json):
                 #      if i < len(tactics):
                 #          executed_ids.append(tactics[i]['id'])
 
-                # CORREÇÃO: Não inferir execução baseada no índice.
-                # Se o agente pula táticas, as anteriores não foram necessariamente executadas.
-                # Enviamos lista vazia para permitir que o agente escolha qualquer tática anterior.
+                # CORREÇÃO: Não inferir execução completa baseada no índice (0..current).
+                # Problema 1: Se o agente pula táticas, as anteriores ficam marcadas como 'executadas' e ele não as escolhe.
+                # Problema 2: Se enviarmos lista vazia [], ele não sabe o que ACABOU de fazer e entra em loop repetindo a mesma.
+                # Solução Paliativa: Enviar APENAS a tática atual (que acabou de finalizar) como executada.
+                # Isso previne o loop imediato e permite escolher qualquer outra (anteriores ou futuras).
+
                 executed_ids = []
+                current_idx = session_json.get('current_tactic_index', 0)
+
+                if 0 <= current_idx < len(tactics):
+                    # Adiciona apenas a tática atual à lista de executadas
+                    executed_ids.append(tactics[current_idx]['id'])
 
         performance_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}/agent_summary")
         performance_summary = performance_res.json().get('summary', 'Sem dados de performance.') if performance_res.status_code == 200 else 'Erro ao buscar performance.'
