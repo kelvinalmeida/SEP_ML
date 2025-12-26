@@ -54,22 +54,41 @@ def critique_strategy():
             "feedback": "<explicação concisa>"
         }}
         """
+        
+        # --- 4. Chamada LLM ---
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
+        )
+        
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Responda apenas JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2 
+        )
+
+        content_text = response.choices[0].message.content
+        ai_response = json.loads(content_text)
 
         # 4. Chamada ao Modelo
         # Usando response_mime_type para forçar JSON (funcionalidade do Gemini 1.5+)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite-preview-09-2025", 
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
-        ) 
+        # response = client.models.generate_content(
+        #     model="gemini-2.5-flash-lite-preview-09-2025", 
+        #     contents=prompt,
+        #     config=types.GenerateContentConfig(
+        #         response_mime_type="application/json"
+        #     )
+        # ) 
 
-        logging.info(f"****************Resposta do Agente Gemini: {response.text}")
+        # logging.info(f"****************Resposta do Agente Gemini: {response.text}")
 
-        # 5. Tratamento da Resposta
-        # A nova SDK retorna o texto limpo, e como pedimos JSON, podemos fazer o parse direto
-        ai_response = json.loads(response.text)
+        # # 5. Tratamento da Resposta
+        # # A nova SDK retorna o texto limpo, e como pedimos JSON, podemos fazer o parse direto
+        # ai_response = json.loads(response.text)
         
         final_score = ai_response.get('grade', 0)
         final_feedback = ai_response.get('feedback', 'Sem feedback gerado.')
@@ -214,18 +233,38 @@ def decide_next_tactic():
 
         # return jsonify({"prompt": prompt}), 200  # DEBUG: Retorna o prompt para verificação
 
-        # --- 5. Chamada ao Gemini ---
-        if not Config.GEMINI_API_KEY:
-             return jsonify({"error": "GEMINI_API_KEY não configurada"}), 500
-
-        client = genai.Client(api_key=Config.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite-preview-09-2025", 
-            contents=prompt,
-            config={'response_mime_type': 'application/json'}
+        # --- 4. Chamada LLM ---
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
         )
         
-        decision_json = json.loads(response.text)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Responda apenas JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2 
+        )
+
+        content_text = response.choices[0].message.content
+        decision_json = json.loads(content_text)
+
+
+        # --- 5. Chamada ao Gemini ---
+        # if not Config.GEMINI_API_KEY:
+        #      return jsonify({"error": "GEMINI_API_KEY não configurada"}), 500
+
+        # client = genai.Client(api_key=Config.GEMINI_API_KEY)
+        # response = client.models.generate_content(
+        #     model="gemini-2.5-flash-lite-preview-09-2025", 
+        #     contents=prompt,
+        #     config={'response_mime_type': 'application/json'}
+        # )
+        
+        # decision_json = json.loads(response.text)
 
         return jsonify({
             "success": True,

@@ -64,6 +64,8 @@ def orchestrate_validation():
             "context": article_content
         }
 
+        # logging.warning(f"Payload enviado ao Strategies Agent: {worker_payload}")
+
         logging.warning(f"Domain Service retornou erro: {domain_response.status_code}")
         
         try:
