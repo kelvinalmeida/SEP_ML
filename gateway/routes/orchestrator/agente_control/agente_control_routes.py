@@ -24,13 +24,8 @@ def execute_agent_logic(session_id, session_json):
         if strategy_id:
             strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
             if strat_res.status_code == 200:
-                # strat_data = strat_res.json()
-                # tactics = strat_data.get('tatics', [])
-                # current_idx = session_json.get('current_tactic_index', 0)
-                # Inclui a atual que está terminando
-                # for i in range(current_idx + 1):
-                #      if i < len(tactics):
-                #          executed_ids.append(tactics[i]['id'])
+                strat_data = strat_res.json()
+                tactics = strat_data.get('tatics', [])
 
                 # CORREÇÃO: Não inferir execução completa baseada no índice (0..current).
                 # Problema 1: Se o agente pula táticas, as anteriores ficam marcadas como 'executadas' e ele não as escolhe.
