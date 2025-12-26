@@ -416,108 +416,112 @@ def add_extra_notes(student_id, current_user=None):
 
 @session_bp.route('/sessions/<int:session_id>/current_tactic', methods=['GET'])
 def get_current_tactic(session_id):
-    # Buscar a sessão
-    session_response = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
+    try:
+        # Buscar a sessão
+        session_response = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
 
-    if session_response.status_code != 200:
-        return jsonify({'error': 'Session not found'}), 404
+        if session_response.status_code != 200:
+            return jsonify({'error': 'Session not found'}), 404
 
-    session_json = session_response.json()
+        session_json = session_response.json()
 
-    if session_json['status'] != 'in-progress':
-        return jsonify({'message': 'Session not started or finished', 'session_status': session_json['status']}), 200
+        if session_json['status'] != 'in-progress':
+            return jsonify({'message': 'Session not started or finished', 'session_status': session_json['status']}), 200
 
-    # Get Current Tactic Index from Session
-    current_tactic_index = session_json.get("current_tactic_index", 0)
+        # Get Current Tactic Index from Session
+        current_tactic_index = session_json.get("current_tactic_index", 0)
 
-    # Fetch all tactics
-    tactics = []
-    current_strategy_id = None
-    if session_json['strategies']:
-         current_strategy_id = session_json['strategies'][0]
-         strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{current_strategy_id}")
-         if strategy_response.status_code == 200:
-             strategy_data = strategy_response.json()
-             tactics = strategy_data.get('tatics', [])
+        # Fetch all tactics
+        tactics = []
+        current_strategy_id = None
+        if session_json['strategies']:
+             current_strategy_id = session_json['strategies'][0]
+             strategy_response = requests.get(f"{STRATEGIES_URL}/strategies/{current_strategy_id}")
+             if strategy_response.status_code == 200:
+                 strategy_data = strategy_response.json()
+                 tactics = strategy_data.get('tatics', [])
 
-    # Check bounds
-    if current_tactic_index >= len(tactics):
-        # Se ultrapassou o número de táticas, pode considerar finalizada ou apenas esperar
-        # Se a intenção é finalizar automaticamente quando acaba:
-        # requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
-        # return jsonify({'message': 'All tactics completed', 'session_status': 'finished'})
+        # Check bounds
+        if current_tactic_index >= len(tactics):
+            # Se ultrapassou o número de táticas, pode considerar finalizada ou apenas esperar
+            # Se a intenção é finalizar automaticamente quando acaba:
+            # requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
+            # return jsonify({'message': 'All tactics completed', 'session_status': 'finished'})
 
-        if session_json['status'] == 'in-progress':
-            logging.info(f"Fim das táticas atingido para a sessão {session_id}. Encerrando automaticamente.")
-            requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
-            session_json['status'] = 'finished'
+            if session_json['status'] == 'in-progress':
+                logging.info(f"Fim das táticas atingido para a sessão {session_id}. Encerrando automaticamente.")
+                requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
+                session_json['status'] = 'finished'
 
-        # Mas como agora é manual, talvez só mostre que acabou
-        return jsonify({'message': 'No more tactics', 'session_status': 'finished'})
+            # Mas como agora é manual, talvez só mostre que acabou
+            return jsonify({'message': 'No more tactics', 'session_status': 'finished'})
 
-    current_tactic = tactics[current_tactic_index]
+        current_tactic = tactics[current_tactic_index]
 
-    # Calculate Remaining Time
-    # Assuming current_tactic_started_at is in session_json
-    # It might be None if the session was created before migration or if start_session didn't set it (but I updated it)
-    # The format coming from Postgres might need parsing.
+        # Calculate Remaining Time
+        # Assuming current_tactic_started_at is in session_json
+        # It might be None if the session was created before migration or if start_session didn't set it (but I updated it)
+        # The format coming from Postgres might need parsing.
 
-    remaining = 0
-    elapsed_time = 0
-    
-    # Fallback to current time if not set (should not happen with new logic)
-    started_at_str = session_json.get("current_tactic_started_at")
+        remaining = 0
+        elapsed_time = 0
 
-    if started_at_str:
-        try:
-             # Try parsing format. Python default isoformat or Postgres string
-             # "Tue, 05 Nov 2024 18:30:00 GMT" or ISO
-             # The Control service uses datetime.utcnow() so it might be returned as string in JSON
-             # Check if it is the RFC format used in start_time or ISO
+        # Fallback to current time if not set (should not happen with new logic)
+        started_at_str = session_json.get("current_tactic_started_at")
 
-             # Parse date string from Control service
-             # Supported formats:
-             # 1. RFC 1123 (e.g., "Fri, 19 Dec 2025 20:20:27 GMT") - Default for Flask jsonify
-             # 2. ISO 8601 with microseconds (e.g., "2024-11-05T18:30:00.123456")
-             # 3. ISO 8601 without microseconds (e.g., "2024-11-05T18:30:00")
-             # 4. Postgres simple format (e.g., "2024-11-05 18:30:00")
+        if started_at_str:
+            try:
+                 # Try parsing format. Python default isoformat or Postgres string
+                 # "Tue, 05 Nov 2024 18:30:00 GMT" or ISO
+                 # The Control service uses datetime.utcnow() so it might be returned as string in JSON
+                 # Check if it is the RFC format used in start_time or ISO
 
-             try:
-                 started_at = datetime.strptime(started_at_str, "%a, %d %b %Y %H:%M:%S %Z")
-             except ValueError:
+                 # Parse date string from Control service
+                 # Supported formats:
+                 # 1. RFC 1123 (e.g., "Fri, 19 Dec 2025 20:20:27 GMT") - Default for Flask jsonify
+                 # 2. ISO 8601 with microseconds (e.g., "2024-11-05T18:30:00.123456")
+                 # 3. ISO 8601 without microseconds (e.g., "2024-11-05T18:30:00")
+                 # 4. Postgres simple format (e.g., "2024-11-05 18:30:00")
+
                  try:
-                     started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S.%f")
+                     started_at = datetime.strptime(started_at_str, "%a, %d %b %Y %H:%M:%S %Z")
                  except ValueError:
                      try:
-                         started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S")
+                         started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S.%f")
                      except ValueError:
-                         started_at = datetime.strptime(started_at_str, "%Y-%m-%d %H:%M:%S")
+                         try:
+                             started_at = datetime.strptime(started_at_str, "%Y-%m-%dT%H:%M:%S")
+                         except ValueError:
+                             started_at = datetime.strptime(started_at_str, "%Y-%m-%d %H:%M:%S")
 
-             elapsed_time = (datetime.utcnow() - started_at).total_seconds()
-             duration_seconds = current_tactic.get('time', 0) * 60
-             remaining = max(0, duration_seconds - elapsed_time)
+                 elapsed_time = (datetime.utcnow() - started_at).total_seconds()
+                 duration_seconds = current_tactic.get('time', 0) * 60
+                 remaining = max(0, duration_seconds - elapsed_time)
 
-        except Exception as e:
-            logging.error(f"Error parsing date: {e}")
-            remaining = current_tactic.get('time', 0) * 60 # Fallback
-    else:
-        # Fallback logic if `current_tactic_started_at` is missing (legacy sessions)
-        # We could default to the old logic or just show full time
-        remaining = current_tactic.get('time', 0) * 60
+            except Exception as e:
+                logging.error(f"Error parsing date: {e}")
+                remaining = current_tactic.get('time', 0) * 60 # Fallback
+        else:
+            # Fallback logic if `current_tactic_started_at` is missing (legacy sessions)
+            # We could default to the old logic or just show full time
+            remaining = current_tactic.get('time', 0) * 60
 
-    return jsonify({
-        'tactic': {
-            'name': current_tactic['name'],
-            'description': current_tactic.get('description', ''),
-            'total_time': current_tactic.get('time', 0) * 60
-        },
-        'remaining_time': int(remaining),
-        'elapsed_time': int(elapsed_time),
-        'strategy_tactics': tactics,
-        'session_status': session_json['status'],
-        'current_tactic_index': current_tactic_index,
-        'strategy_id': current_strategy_id
-    })
+        return jsonify({
+            'tactic': {
+                'name': current_tactic['name'],
+                'description': current_tactic.get('description', ''),
+                'total_time': current_tactic.get('time', 0) * 60
+            },
+            'remaining_time': int(remaining),
+            'elapsed_time': int(elapsed_time),
+            'strategy_tactics': tactics,
+            'session_status': session_json['status'],
+            'current_tactic_index': current_tactic_index,
+            'strategy_id': current_strategy_id
+        })
+    except RequestException as e:
+        logging.error(f"Control service unavailable during polling: {e}")
+        return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
 
 
 @session_bp.route('/sessions/<int:session_id>/change_strategy', methods=['POST'])
