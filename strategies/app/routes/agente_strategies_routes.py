@@ -7,6 +7,8 @@ from openai import OpenAI
 from google import genai
 from google.genai import types
 
+logging.basicConfig(level=logging.INFO)
+
 agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
 
 # Configuração da API Key
@@ -221,6 +223,7 @@ def decide_next_tactic():
         1. Olhe para o "Táticas já realizadas" para não repetir as taticas.
         2. Considere o tempo disponível.
         3. Se o desempenho for RUIM, simplifique. Se for BOM, aprofunde.
+        4. Não seja linear na escolha das taticas, ou seja, se falta executar taticas de id 1, 2 e 3, escolha a de id 3 depois a 2 e por fim a 1.
 
         === SAÍDA (JSON) ===
         Responda APENAS:
@@ -228,8 +231,14 @@ def decide_next_tactic():
             "chosen_tactic_id": 0,
             "tactic_name": "Nome",
             "reasoning": "Por que escolheu esta baseado no histórico e notas."
-        }}
+        }} 
         """
+
+        # logging.warning("WARNING aparece")
+        # logging.info("INFO aparece?")
+
+        logging.info(f"Prompt enviado ao LLM: {prompt}")
+
 
         # return jsonify({"prompt": prompt}), 200  # DEBUG: Retorna o prompt para verificação
 

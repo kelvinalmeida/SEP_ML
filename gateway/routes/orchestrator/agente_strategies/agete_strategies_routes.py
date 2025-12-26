@@ -161,6 +161,8 @@ def execute_rules_logic(session_id):
                         student_profile_summary = json.dumps(summary_data, ensure_ascii=False)
                     else:
                         student_profile_summary = str(summary_data)
+            
+            # logging.info(f"Perfil resumido dos alunos para a tatica de regras: {student_profile_summary}")
         except Exception as e:
             logging.warning(f"Erro ao conectar com User: {e}")
 
