@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let apresentacaoSicrona_isActive = false;
     let reuso_isActive = false;
     let envio_informacao_isActive = false;
+    let regras_isActive = false; // Novo flag para Regras
     let current_tatic_description = 'Nenhuma tática ativa no momento.';
 
     const session_id = window.session_id;
@@ -45,11 +46,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    function qual_tatica_esta_ativa(debate_sicrono, apresentacao_sincrona, reuso, envio_informacao) {
+    function qual_tatica_esta_ativa(debate_sicrono, apresentacao_sincrona, reuso, envio_informacao, regras) {
         debateSicrono_isActive = debate_sicrono;
         apresentacaoSicrona_isActive = apresentacao_sincrona;
         reuso_isActive = reuso;
         envio_informacao_isActive = envio_informacao;
+        regras_isActive = regras;
         // console.log("Tática Ativa: ", debateSicrono, apresentacaoSicrona, reuso);
     }
 
@@ -159,8 +161,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Evitar adicionar o botão várias vezes:
                     if (!document.getElementById("debate_sicrono")) {
 
-                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
-                        qual_tatica_esta_ativa(true, false, false, false);
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao, regras)
+                        qual_tatica_esta_ativa(true, false, false, false, false);
 
                         removerElemento();
 
@@ -183,8 +185,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 else if (tacticName == "Apresentacao Sincrona") {
                     if (!document.getElementById("apresentacao_sincrona")) {
 
-                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
-                        qual_tatica_esta_ativa(false, true, false, false);
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao, regras)
+                        qual_tatica_esta_ativa(false, true, false, false, false);
                         removerElemento();
 
                         let button = document.createElement("button");
@@ -219,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 else if (tacticName == "Reuso") {
                     if (!document.getElementById("reuso_tabs")) {
 
-                        qual_tatica_esta_ativa(false, false, true, false);
+                        qual_tatica_esta_ativa(false, false, true, false, false);
                         removerElemento();
 
                         const tatic_here = document.getElementById("tatic_here");
@@ -464,8 +466,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 else if (tacticName == "Envio de Informacao") {
                     if (!document.getElementById("envio_informacao_aviso")) {
 
-                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao)
-                        qual_tatica_esta_ativa(false, false, false, true);
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao, regras)
+                        qual_tatica_esta_ativa(false, false, false, true, false);
                         removerElemento();
 
                         // Criar container visual com mensagem e botão
@@ -503,6 +505,88 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }
 
+                // --------------------------------------------------------
+                // NOVA LÓGICA: TÁTICA DE REGRA (Agente Decisor)
+                // --------------------------------------------------------
+                else if (tacticName == "Regra" || tacticName == "Regras") {
+                    // Evita executar múltiplas vezes se já estiver "ativo" ou processando
+                    if (!document.getElementById("regra_processing")) {
+
+                        // (debate_sicrono, apresentacao_sincrona, reuso, envio_informacao, regras)
+                        qual_tatica_esta_ativa(false, false, false, false, true);
+                        removerElemento();
+
+                        const tatic_here = document.getElementById("tatic_here");
+
+                        // Card visual de processamento
+                        const processingDiv = document.createElement("div");
+                        processingDiv.id = "regra_processing";
+                        processingDiv.className = "card shadow border-primary mb-3 text-center p-4";
+                        processingDiv.innerHTML = `
+                            <div class="card-body">
+                                <h3 class="card-title text-primary mb-3">
+                                    <i class="bi bi-cpu-fill"></i> Agente de Estratégia
+                                </h3>
+                                <p class="card-text lead">
+                                    Analisando o desempenho da turma e o conteúdo para decidir o próximo passo...
+                                </p>
+                                <div class="spinner-border text-primary mt-3" role="status" style="width: 3rem; height: 3rem;">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2 text-muted"><small>Isso pode levar alguns segundos.</small></p>
+                            </div>
+                        `;
+                        tatic_here.appendChild(processingDiv);
+
+                        // --- Chamada ao Backend ---
+                        console.log("Iniciando execução da Tática de Regras...");
+                        fetch(`/sessions/${session_id}/execute_rules`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        })
+                        .then(response => {
+                            if (!response.ok) throw new Error("Erro na execução da regra");
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log("Decisão do Agente de Regras:", data);
+
+                            // Atualiza a UI com a decisão
+                            processingDiv.innerHTML = `
+                                <div class="card-body">
+                                    <h3 class="card-title text-success mb-3">
+                                        <i class="bi bi-check-circle-fill"></i> Decisão Tomada!
+                                    </h3>
+                                    <p class="card-text lead">
+                                        <strong>Ação:</strong> ${data.decision === 'REPEAT_TACTIC' ? 'Reforço de Conteúdo (Repetir Tática)' : 'Avançar Estratégia'}
+                                    </p>
+                                    <div class="alert alert-secondary text-start" role="alert">
+                                        <strong><i class="bi bi-lightbulb"></i> Motivo:</strong> ${data.reasoning}
+                                    </div>
+                                    <p class="mt-3 text-muted">Redirecionando...</p>
+                                </div>
+                            `;
+
+                            // Pequeno delay para leitura antes de recarregar
+                            setTimeout(() => {
+                                location.reload();
+                            }, 4000);
+                        })
+                        .catch(err => {
+                            console.error("Falha na regra:", err);
+                            processingDiv.innerHTML = `
+                                <div class="alert alert-danger">
+                                    Ocorreu um erro ao processar a regra. Avançando automaticamente...
+                                </div>
+                            `;
+                            // Fallback: Avança forçado após erro
+                            setTimeout(() => {
+                                fetch(`/sessions/${session_id}/next_tactic`, { method: 'POST' })
+                                .then(() => location.reload());
+                            }, 3000);
+                        });
+                    }
+                }
             }
 
         }, 1000);
@@ -543,6 +627,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (envio_informacao_aviso && !envio_informacao_isActive) {
             envio_informacao_aviso.remove();
         }
+
+        let regraProcessing = document.getElementById("regra_processing");
+        if (regraProcessing && !regras_isActive) {
+            regraProcessing.remove();
+        }
     }
 
     function realod_page() {
@@ -573,7 +662,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     document.getElementById("tacticName").innerText = "Sessão finalizada";
                     document.getElementById("tacticTimer").innerText = "--";
-                    qual_tatica_esta_ativa(false, false, false, false);
+                    qual_tatica_esta_ativa(false, false, false, false, false);
                     removerElemento();
                     taticDescription("Sessão finalizada ou sem tática ativa no momento.");
                     clearInterval(countdownInterval);
