@@ -143,10 +143,20 @@ def get_session_by_id(session_id, current_user=None):
         studantes_with_id_and_username = requests.get(f"{USER_URL}/students").json()
         session["students_ids_with_usernames"] = students['ids_with_usernames']
 
-        domains_params = { 'ids': session.get("domains", [])}
-        domains = requests.get(f"{DOMAIN_URL}/domains/ids_to_names", params=domains_params).json()
-        session["domains"] = domains
+        # --- CORREÇÃO: Buscar detalhes COMPLETOS do domínio (incluindo PDFs) ---
+        # Antes buscava apenas ids_to_names, o que não retornava a lista de arquivos.
+        # Agora iteramos pelos IDs e buscamos os dados completos de cada domínio.
+        domain_ids = session.get("domains", [])
+        full_domains = []
+        for d_id in domain_ids:
+            try:
+                d_res = requests.get(f"{DOMAIN_URL}/domains/{d_id}")
+                if d_res.status_code == 200:
+                    full_domains.append(d_res.json())
+            except Exception as e:
+                logging.error(f"Erro ao buscar detalhes do domínio {d_id}: {e}")
 
+        session["domains"] = full_domains
 
         # return f"{session}"
         return render_template("control/show_session.html", session=session, current_user=current_user, studantes_with_id_and_username=studantes_with_id_and_username)
