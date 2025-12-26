@@ -11,7 +11,7 @@ agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
 
 # Configuração da API Key
 # Tenta pegar do ambiente (Docker env), ou usa a chave direta como fallback
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 
 # Tenta importar a conexão do banco
@@ -199,7 +199,7 @@ def decide_next_tactic():
         {tactics_joined}
 
         === REGRAS ===
-        1. Olhe para o "Táticas já realizadas". Se o aluno já fez um "Vídeo (ID X)", NÃO escolha outro vídeo agora, tente variar (ex: Quiz ou Leitura), a menos que o desempenho peça reforço.
+        1. Olhe para o "Táticas já realizadas" para não repetir as taticas.
         2. Considere o tempo disponível.
         3. Se o desempenho for RUIM, simplifique. Se for BOM, aprofunde.
 
@@ -244,27 +244,20 @@ def decide_next_tactic():
 
 
 
-@agente_strategies_bp.route('/agent/decide_reuse_logic', methods=['POST'])
-def decide_reuse_logic():
+@agente_strategies_bp.route('/agent/decide_rules_logic', methods=['POST'])
+def decide_rules_logic():
     """
-    Agente de Estratégia (Lógica de Reuso):
-    Analisa se a turma absorveu o conteúdo.
-    - Se DESEMPENHO BAIXO: Sugere repetir uma tática anterior (Reuso/Reforço).
-    - Se DESEMPENHO ALTO: Sugere avançar para uma nova Estratégia do banco.
+    Agente de Regras (Inteligente):
+    - Se Reforço: Escolhe QUAL tática anterior é a melhor para sanar a dúvida.
+    - Se Avanço: Escolhe a próxima estratégia baseada no 'score' (qualidade).
     """
     data = request.get_json()
 
-    # --- 1. Extração do Contexto (Vindo do Orquestrador) ---
-    # Resumo do Control (Notas e Status)
-    performance_summary = data.get('performance_summary', 'Sem dados de performance.')
-    
-    # Resumo do User (Preferências)
+    # --- 1. Extração do Contexto ---
+    performance_summary = data.get('performance_summary', 'Sem dados.')
     student_profile = data.get('student_profile_summary', 'Perfil desconhecido.')
+    domain_content = data.get('article_text', '')[:800] 
     
-    # Conteúdo do Domain (O que foi ensinado)
-    domain_content = data.get('article_text', '')[:1000] # Limita caracteres para não estourar contexto
-    
-    # Histórico (O que já foi feito)
     current_strategy_id = data.get('strategy_id')
     executed_tactics_ids = data.get('executed_tactics', [])
 
@@ -277,28 +270,45 @@ def decide_reuse_logic():
             return jsonify({"error": "Falha na conexão com o banco"}), 500
 
         with conn.cursor() as cur:
-            # A. Busca nomes das táticas já executadas (Para sugerir repetição se necessário)
-            executed_names = []
+            # A. Táticas Já Executadas (Opções para Reforço)
+            # Buscamos Nome e Descrição para o LLM saber o que cada uma faz
+            executed_options = []
             if executed_tactics_ids:
-                cur.execute("SELECT id, name FROM tactics WHERE id = ANY(%s)", (executed_tactics_ids,))
+                clean_ids = [int(x) for x in executed_tactics_ids]
+                cur.execute("""
+                    SELECT id, name, description 
+                    FROM tactics 
+                    WHERE id = ANY(%s)
+                """, (clean_ids,))
                 rows = cur.fetchall()
                 for r in rows:
-                    # Ajuste conforme retorno (Dict ou Tupla)
                     r_id = r['id'] if isinstance(r, dict) else r[0]
                     r_name = r['name'] if isinstance(r, dict) else r[1]
-                    executed_names.append(f"{r_name} (ID {r_id})")
+                    r_desc = r['description'] if isinstance(r, dict) else r[2]
+                    # Formata para o LLM: "ID 1: Nome (Desc)"
+                    executed_options.append(f"- ID {r_id}: {r_name} ({r_desc})")
 
-            # B. Busca OUTRAS Estratégias disponíveis no banco (Para sugerir mudança)
-            # Excluindo a estratégia atual para não sugerir "mudar para o que já estou"
-            cur.execute("SELECT id, name FROM strategies WHERE id != %s", (int(current_strategy_id),))
-            strat_rows = cur.fetchall()
-            available_strategies = []
-            for r in strat_rows:
-                s_id = r['id'] if isinstance(r, dict) else r[0]
-                s_name = r['name'] if isinstance(r, dict) else r[1]
-                available_strategies.append(f"Estratégia: {s_name} (ID {s_id})")
+            # B. Outras Estratégias Disponíveis (Opções para Avanço)
+            # IMPORTANTE: Agora buscamos o 'score' para priorizar as melhores
+            if current_strategy_id:
+                cur.execute("""
+                    SELECT id, name, score 
+                    FROM strategies 
+                    WHERE id != %s
+                    ORDER BY score DESC
+                """, (int(current_strategy_id),))
+                strat_rows = cur.fetchall()
+                available_strategies = []
+                for r in strat_rows:
+                    s_id = r['id'] if isinstance(r, dict) else r[0]
+                    s_name = r['name'] if isinstance(r, dict) else r[1]
+                    s_score = r['score'] if isinstance(r, dict) else r[2]
+                    # Formata: "Estratégia X (ID 10) - Nota: 9"
+                    available_strategies.append(f"- ID {s_id}: {s_name} (Nota de Qualidade: {s_score})")
+            else:
+                available_strategies = ["Nenhuma estratégia extra disponível."]
 
-        # --- 2. Configuração do Cliente Groq ---
+        # --- 2. Cliente Groq ---
         if not Config.GROQ_API_KEY:
              return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
 
@@ -307,49 +317,48 @@ def decide_reuse_logic():
             base_url="https://api.groq.com/openai/v1"
         )
 
-        # --- 3. Construção do Prompt (Engenharia de Decisão) ---
+        # --- 3. Prompt Avançado ---
         prompt = f"""
-        Você é um Especialista em Adaptação Pedagógica (Agente de Reuso).
-        Sua função é analisar o final de um ciclo de ensino e decidir o próximo passo.
-
-        === DADOS DA TURMA ===
-        Perfil: {student_profile}
-        Desempenho na Sessão: {performance_summary}
+        Você é o 'Agente de Regras' (Cérebro da Sessão) de um Sistema Tutor Inteligente.
         
-        === CONTEXTO DO CONTEÚDO ===
-        Trecho do Material: {domain_content}...
+        === SITUAÇÃO ATUAL ===
+        Perfil da Turma: {student_profile}
+        Desempenho: {performance_summary}
+        Conteúdo: {domain_content}...
 
-        === OPÇÕES DE AÇÃO ===
-        1. REPETIR TÁTICA (Reforço):
-           Use esta opção se o desempenho for fraco, confuso ou abaixo da média.
-           Táticas que podem ser repetidas: {', '.join(executed_names)}
-        
-        2. MUDAR DE ESTRATÉGIA (Avançar):
-           Use esta opção se o desempenho for bom/suficiente e a turma estiver pronta para algo novo.
-           Outras estratégias disponíveis: {', '.join(available_strategies)}
+        === OPÇÕES DE REFORÇO (Histórico Recente) ===
+        {chr(10).join(executed_options) if executed_options else "Nenhuma tática executada ainda."}
 
-        === OBJETIVO ===
-        Analise os dados. Se a turma aprendeu, avance. Se não, repita.
-        
-        === SAÍDA ESPERADA (JSON) ===
-        Responda APENAS um JSON neste formato:
+        === OPÇÕES DE PRÓXIMA ESTRATÉGIA (Banco de Estratégias) ===
+        {chr(10).join(available_strategies)}
+
+        === SUA MISSÃO (REGRA DE DECISÃO) ===
+        1. ANALISE O DESEMPENHO:
+           - Se for BAIXO/RUIM: Você DEVE escolher "REPEAT_TACTIC".
+             * **Importante:** Não escolha aleatoriamente. Escolha a tática da lista "OPÇÕES DE REFORÇO" que melhor resolve o problema. 
+             * Exemplo: Se eles não entenderam a teoria, repita a tática de "Reuso". Se faltou tirar duvidas, repita o "Debate Síncrono", "Apresentação Síncrona" ou "Envio de Informação".
+           
+           - Se for ALTO/BOM: Você DEVE escolher "NEXT_STRATEGY".
+             * **Importante:** Escolha a estratégia da lista "OPÇÕES DE PRÓXIMA ESTRATÉGIA" que tiver a MAIOR 'Nota de Qualidade' (Score), a menos que o perfil da turma exija algo específico.
+
+        === SAÍDA (JSON OBRIGATÓRIO) ===
         {{
-            "decision": "REUSE" ou "CHANGE_STRATEGY",
-            "target_id": <ID_DA_TATICA_PARA_REPETIR ou ID_DA_NOVA_ESTRATEGIA>,
-            "target_name": "<Nome da Tática ou Estratégia>",
-            "reasoning": "<Explicação curta baseada nas notas e perfil>"
+            "decision": "REPEAT_TACTIC" ou "NEXT_STRATEGY",
+            "target_id": <ID inteiro da Tática escolhida ou da Estratégia escolhida>,
+            "target_name": "<Nome da opção escolhida>",
+            "reasoning": "<Explique por que escolheu ESSE ID específico (ex: 'Escolhi a estratégia X pois tem nota 9' ou 'Repeti o Reuso pois a turma falhou na teoria')>"
         }}
         """
 
-        # --- 4. Chamada ao Modelo (Groq / Llama 3) ---
+        # --- 4. Chamada LLM ---
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile", # Modelo rápido e inteligente da Groq
+            model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "Responda sempre em JSON válido."},
+                {"role": "system", "content": "Responda apenas JSON."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.1 # Baixa temperatura para decisão lógica
+            temperature=0.2 
         )
 
         content_text = response.choices[0].message.content
@@ -357,11 +366,11 @@ def decide_reuse_logic():
 
         return jsonify({
             "success": True,
-            "analysis": decision_json
+            "rule_execution": decision_json
         }), 200
 
     except Exception as e:
-        logging.error(f"Erro no Agente Strategies (Reuse): {str(e)}")
+        logging.error(f"Erro no Agente Rules: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
