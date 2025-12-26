@@ -249,14 +249,17 @@ def next_tactic(session_id, current_user=None):
 
         session_json = session_res.json()
         use_agent = session_json.get("use_agent", False)
+        end_on_next_completion = session_json.get("end_on_next_completion", False)
 
-        if use_agent:
+        # Se houver uma flag de término programada (por regra), IGNORA o agente e força o fluxo normal
+        # O fluxo normal (Control/next_tactic) vai detectar a flag e encerrar a sessão.
+        if use_agent and not end_on_next_completion:
             # Chama o Orquestrador refatorado
             agent_response = execute_agent_logic(session_id, session_json)
             if agent_response:
                 return agent_response
 
-        # === FLUXO NORMAL (LINEAR) ===
+        # === FLUXO NORMAL (LINEAR) OU TÉRMINO PROGRAMADO ===
 
         # 1. Avança a tática no Microserviço de Controle
         response = requests.post(f"{CONTROL_URL}/sessions/tactic/next/{session_id}")

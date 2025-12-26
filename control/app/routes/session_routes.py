@@ -70,6 +70,7 @@ def get_session_details(conn, session_id):
         session_dict = dict(session)
         # Ensure use_agent is present in the dict, defaulting to False if not in DB row (handled by SQL default)
         session_dict['use_agent'] = session.get('use_agent', False)
+        session_dict['end_on_next_completion'] = session.get('end_on_next_completion', False)
         session_dict['strategies'] = strategies
         session_dict['teachers'] = teachers
         session_dict['students'] = students
@@ -78,6 +79,54 @@ def get_session_details(conn, session_id):
         session_dict['extra_notes'] = [dict(en) for en in extra_notes]
 
         return session_dict
+
+def ensure_end_flag_column(conn):
+    with conn.cursor() as cur:
+        try:
+            # Check if column exists to avoid error spam in logs (though IF NOT EXISTS handles it)
+            # Just run the ALTER command, if it fails due to existing, it's fine.
+            # Postgres supports IF NOT EXISTS for ADD COLUMN in newer versions (9.6+)
+            cur.execute("ALTER TABLE session ADD COLUMN IF NOT EXISTS end_on_next_completion BOOLEAN DEFAULT FALSE")
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            # Ignore duplicate column errors or just log
+            logging.warning(f"Note on ensure_end_flag_column: {e}")
+
+def _end_session(conn, session_id):
+    """
+    Helper to end the session logic, allowing reuse.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
+        session = cur.fetchone()
+        if not session:
+            return False
+
+        # Revert to original strategy if it was changed
+        if session.get('original_strategy_id'):
+            original_strategy_id = session['original_strategy_id']
+            # Revert session_strategies
+            cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
+            cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
+                       (session_id, str(original_strategy_id)))
+
+            # Clear the original_strategy_id column
+            cur.execute("UPDATE session SET status = 'finished', original_strategy_id = NULL WHERE id = %s", (session_id,))
+        else:
+            cur.execute("UPDATE session SET status = 'finished' WHERE id = %s", (session_id,))
+
+        conn.commit()
+    return True
+
+@session_bp.route('/sessions/<int:session_id>/set_end_flag', methods=['POST'])
+def set_end_flag(session_id):
+    with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
+        with conn.cursor() as cur:
+             cur.execute("UPDATE session SET end_on_next_completion = TRUE WHERE id = %s", (session_id,))
+             conn.commit()
+    return jsonify({"success": True}), 200
 
 @session_bp.route('/sessions/create', methods=['POST'])
 def create_session():
@@ -186,6 +235,7 @@ def start_session(session_id):
     use_agent = data.get('use_agent', False)
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -194,7 +244,7 @@ def start_session(session_id):
             start_time = datetime.utcnow()
             cur.execute("""
                 UPDATE session
-                SET status = 'in-progress', start_time = %s, current_tactic_index = 0, current_tactic_started_at = %s, use_agent = %s
+                SET status = 'in-progress', start_time = %s, current_tactic_index = 0, current_tactic_started_at = %s, use_agent = %s, end_on_next_completion = FALSE
                 WHERE id = %s
                 RETURNING status, start_time
             """, (start_time, start_time, use_agent, session_id))
@@ -212,26 +262,9 @@ def start_session(session_id):
 @session_bp.route('/sessions/end/<int:session_id>', methods=['POST'])
 def end_session(session_id):
     with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
-            session = cur.fetchone()
-            if not session:
-                return jsonify({"error": "Session not found"}), 404
-
-            # Revert to original strategy if it was changed
-            if session['original_strategy_id']:
-                original_strategy_id = session['original_strategy_id']
-                # Revert session_strategies
-                cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
-                cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
-                           (session_id, str(original_strategy_id)))
-
-                # Clear the original_strategy_id column
-                cur.execute("UPDATE session SET status = 'finished', original_strategy_id = NULL WHERE id = %s", (session_id,))
-            else:
-                cur.execute("UPDATE session SET status = 'finished' WHERE id = %s", (session_id,))
-
-            conn.commit()
+        success = _end_session(conn, session_id)
+        if not success:
+             return jsonify({"error": "Session not found"}), 404
 
     return jsonify({"session_id": session_id, "message": "Session ended!"})
 
@@ -245,6 +278,7 @@ def temp_switch_strategy(session_id):
         return jsonify({"error": "Strategy ID is required"}), 400
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
             session = cur.fetchone()
@@ -270,7 +304,8 @@ def temp_switch_strategy(session_id):
             cur.execute("""
                 UPDATE session
                 SET current_tactic_index = 0,
-                    current_tactic_started_at = %s
+                    current_tactic_started_at = %s,
+                    end_on_next_completion = FALSE
                 WHERE id = %s
             """, (start_time, session_id))
 
@@ -282,6 +317,22 @@ def temp_switch_strategy(session_id):
 @session_bp.route('/sessions/tactic/next/<int:session_id>', methods=['POST'])
 def next_tactic(session_id):
     with get_db_connection() as conn:
+        # Check for end_on_next_completion flag
+        end_flag = False
+        with conn.cursor() as cur:
+            try:
+                cur.execute("SELECT end_on_next_completion FROM session WHERE id = %s", (session_id,))
+                res = cur.fetchone()
+                if res and res.get('end_on_next_completion'):
+                    end_flag = True
+            except Exception:
+                # Column likely missing, ignore
+                conn.rollback()
+
+        if end_flag:
+            _end_session(conn, session_id)
+            return jsonify({"success": True, "session_status": "finished", "message": "Session ended by rule."})
+
         with conn.cursor() as cur:
             cur.execute("SELECT id, current_tactic_index FROM session WHERE id = %s", (session_id,))
             session = cur.fetchone()
@@ -468,6 +519,7 @@ def change_session_strategy(session_id):
         return jsonify({"error": "Strategy ID is required"}), 400
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -490,7 +542,8 @@ def change_session_strategy(session_id):
                 SET status = 'in-progress',
                     start_time = %s,
                     current_tactic_index = 0,
-                    current_tactic_started_at = %s
+                    current_tactic_started_at = %s,
+                    end_on_next_completion = FALSE
                 WHERE id = %s
             """, (start_time, start_time, session_id))
 
@@ -508,6 +561,7 @@ def change_session_domain(session_id):
         return jsonify({"error": "Domain ID is required"}), 400
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -528,7 +582,8 @@ def change_session_domain(session_id):
                 SET status = 'in-progress',
                     start_time = %s,
                     current_tactic_index = 0,
-                    current_tactic_started_at = %s
+                    current_tactic_started_at = %s,
+                    end_on_next_completion = FALSE
                 WHERE id = %s
             """, (start_time, start_time, session_id))
 
