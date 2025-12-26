@@ -139,11 +139,20 @@ def execute_rules_logic(session_id):
                     strategy_data = strat_response.json()
                     strategy_tactics = strategy_data.get('tatics', [])
 
-                    # Assume ordem da lista = ordem de execução
-                    # Executadas são aquelas ANTES do índice atual (que é a Regra)
-                    for i, tactic in enumerate(strategy_tactics):
-                        if i < current_tactic_index:
-                            executed_tactics_ids.append(tactic['id'])
+                    # CORREÇÃO: Não inferir execução baseada apenas no índice (i < current_index).
+                    # Se o agente pulou táticas (ex: foi da 1 para a 4), as táticas 2 e 3 não foram executadas.
+                    # Como não temos log exato de navegação no MVP, enviamos lista vazia ou parcial
+                    # para permitir que o agente escolha qualquer tática anterior se julgar necessário.
+                    #
+                    # OLD LOGIC:
+                    # for i, tactic in enumerate(strategy_tactics):
+                    #     if i < current_tactic_index:
+                    #         executed_tactics_ids.append(tactic['id'])
+
+                    # NEW LOGIC: Esvaziar lista (ou futura implementação de log real)
+                    # Isso libera o agente para escolher táticas que foram "puladas".
+                    executed_tactics_ids = []
+
         except Exception as e:
             logging.error(f"Erro ao conectar com Strategies: {e}")
             return jsonify({"error": "Strategies Service unavailable"}), 503
