@@ -24,13 +24,18 @@ def execute_agent_logic(session_id, session_json):
         if strategy_id:
             strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
             if strat_res.status_code == 200:
-                strat_data = strat_res.json()
-                tactics = strat_data.get('tatics', [])
-                current_idx = session_json.get('current_tactic_index', 0)
+                # strat_data = strat_res.json()
+                # tactics = strat_data.get('tatics', [])
+                # current_idx = session_json.get('current_tactic_index', 0)
                 # Inclui a atual que está terminando
-                for i in range(current_idx + 1):
-                     if i < len(tactics):
-                         executed_ids.append(tactics[i]['id'])
+                # for i in range(current_idx + 1):
+                #      if i < len(tactics):
+                #          executed_ids.append(tactics[i]['id'])
+
+                # CORREÇÃO: Não inferir execução baseada no índice.
+                # Se o agente pula táticas, as anteriores não foram necessariamente executadas.
+                # Enviamos lista vazia para permitir que o agente escolha qualquer tática anterior.
+                executed_ids = []
 
         performance_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}/agent_summary")
         performance_summary = performance_res.json().get('summary', 'Sem dados de performance.') if performance_res.status_code == 200 else 'Erro ao buscar performance.'
