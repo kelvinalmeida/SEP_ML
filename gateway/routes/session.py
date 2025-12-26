@@ -11,6 +11,7 @@ from .auth import token_required
 from datetime import datetime
 from .services_routs import CONTROL_URL, STRATEGIES_URL, USER_URL, DOMAIN_URL
 from .orchestrator.agente_control.agente_control_routes import execute_agent_logic
+from .orchestrator.agente_strategies.agete_strategies_routes import execute_rules_logic
 
 session_bp = Blueprint("session", __name__)
 
@@ -263,7 +264,7 @@ def next_tactic(session_id, current_user=None):
         if response.status_code != 200:
              return (response.text, response.status_code, response.headers.items())
 
-        # 2. Verifica se a NOVA tática é do tipo "Mudança de Estratégia"
+        # 2. Verifica se a NOVA tática tem lógica especial (Ex: Mudança ou Regra)
         session_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
         if session_res.status_code != 200:
             return jsonify({"error": "Failed to fetch session details"}), 500
@@ -286,12 +287,21 @@ def next_tactic(session_id, current_user=None):
             if 0 <= current_tactic_index < len(tactics):
                 current_tactic = tactics[current_tactic_index]
                 
-                # --- LÓGICA DE DETECÇÃO MELHORADA ---
+                # --- LÓGICA DE DETECÇÃO ---
                 tactic_name = current_tactic['name'].strip().lower()
-                valid_names = ["mudanca de estrategia", "mudança de estratégia", "mudança de estrategia", "mudanca de estratégia"]
 
-                # Verifica se o nome bate (ignorando maiúsculas/minúsculas)
-                if tactic_name in valid_names:
+                # A. Tática de Regra (Agente de Regras)
+                if "regra" in tactic_name:
+                    logging.info("🧠 Tática de Regra detectada. Acionando Agente de Regras...")
+                    # Invoca a lógica de regras que decide o próximo passo
+                    execute_rules_logic(session_id)
+
+                    # O Agente pode ter mudado a tática (jump ou switch strategy)
+                    # Não precisamos fazer mais nada, o frontend vai recarregar e pegar o novo estado
+
+                # B. Tática de Mudança de Estratégia
+                valid_switch_names = ["mudanca de estrategia", "mudança de estratégia", "mudança de estrategia", "mudanca de estratégia"]
+                if tactic_name in valid_switch_names:
                     description = str(current_tactic.get('description', ''))
                     
                     # Usa Regex para encontrar o primeiro número na descrição (o ID da estratégia)
