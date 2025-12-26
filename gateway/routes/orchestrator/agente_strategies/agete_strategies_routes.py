@@ -139,11 +139,30 @@ def execute_rules_logic(session_id):
                     strategy_data = strat_response.json()
                     strategy_tactics = strategy_data.get('tatics', [])
 
-                    # Assume ordem da lista = ordem de execução
-                    # Executadas são aquelas ANTES do índice atual (que é a Regra)
-                    for i, tactic in enumerate(strategy_tactics):
-                        if i < current_tactic_index:
-                            executed_tactics_ids.append(tactic['id'])
+                    # CORREÇÃO: Não inferir execução baseada apenas no índice (i < current_index).
+                    # Se o agente pulou táticas (ex: foi da 1 para a 4), as táticas 2 e 3 não foram executadas.
+                    # Como não temos log exato de navegação no MVP, enviamos lista vazia ou parcial
+                    # para permitir que o agente escolha qualquer tática anterior se julgar necessário.
+                    #
+                    # OLD LOGIC:
+                    # for i, tactic in enumerate(strategy_tactics):
+                    #     if i < current_tactic_index:
+                    #         executed_tactics_ids.append(tactic['id'])
+
+                    # NOVO: Usar executed_indices do Control
+                    executed_indices = session_data.get('executed_indices', [])
+
+                    # Mapeia índices para IDs
+                    for idx in executed_indices:
+                        if 0 <= idx < len(strategy_tactics):
+                            executed_tactics_ids.append(strategy_tactics[idx]['id'])
+
+                    # Adiciona a atual (que acabou de finalizar/está em Regra)
+                    if 0 <= current_tactic_index < len(strategy_tactics):
+                        current_id = strategy_tactics[current_tactic_index]['id']
+                        if current_id not in executed_tactics_ids:
+                            executed_tactics_ids.append(current_id)
+
         except Exception as e:
             logging.error(f"Erro ao conectar com Strategies: {e}")
             return jsonify({"error": "Strategies Service unavailable"}), 503

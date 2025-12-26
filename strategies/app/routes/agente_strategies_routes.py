@@ -4,8 +4,8 @@ import logging
 from flask import Blueprint, request, jsonify, current_app
 from config import Config
 from openai import OpenAI
-from google import genai
-from google.genai import types
+# from google import genai
+# from google.genai import types
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,7 +13,7 @@ agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
 
 # Configuração da API Key
 # Tenta pegar do ambiente (Docker env), ou usa a chave direta como fallback
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 
 # Tenta importar a conexão do banco
@@ -26,7 +26,7 @@ except ImportError:
 @agente_strategies_bp.route('/agent/critique', methods=['POST'])
 def critique_strategy():
     """
-    Agente Worker: Crítico Pedagógico (Versão Google GenAI SDK v1)
+    Agente Worker: Crítico Pedagógico
     """
     try:
         # 1. Extração de dados
@@ -36,7 +36,7 @@ def critique_strategy():
         reference_article = data.get('context')
 
         # 2. Configuração do Cliente (Nova SDK)
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        # client = genai.Client(api_key=GEMINI_API_KEY)
 
         # 3. Construção do Prompt
         prompt = f"""
@@ -164,6 +164,8 @@ def decide_next_tactic():
             # --- 3. Busca Nomes das Táticas JÁ EXECUTADAS (Histórico) ---
             # O Gemini precisa saber que o ID 1 é "Vídeo" para não repetir "Vídeo"
             executed_names_list = []
+
+            logging.info(f"Táticas executadas (IDs): {executed_ids}")
             
             if executed_ids:
                 # Query para pegar nomes baseados nos IDs recebidos

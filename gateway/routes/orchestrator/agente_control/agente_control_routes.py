@@ -19,18 +19,31 @@ def execute_agent_logic(session_id, session_json):
         # 1. Dados da Sessão (Control)
         strategy_id = session_json.get('strategies', [None])[0]
 
-        # Inferir táticas executadas
+        # Inferir táticas executadas (usando histórico real do Control)
         executed_ids = []
         if strategy_id:
             strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
             if strat_res.status_code == 200:
                 strat_data = strat_res.json()
                 tactics = strat_data.get('tatics', [])
+
+                # NOVO: Usar executed_indices do Control
+                executed_indices = session_json.get('executed_indices', [])
                 current_idx = session_json.get('current_tactic_index', 0)
-                # Inclui a atual que está terminando
-                for i in range(current_idx + 1):
-                     if i < len(tactics):
-                         executed_ids.append(tactics[i]['id'])
+
+                # Mapeia índices para IDs
+                for idx in executed_indices:
+                    if 0 <= idx < len(tactics):
+                        executed_ids.append(tactics[idx]['id'])
+
+                # Adiciona a atual também, pois ela acabou de ser "feita" no momento da decisão
+                # Evita duplicidade se já estiver no histórico (embora Control adicione no next, aqui estamos decidindo O PRÓXIMO)
+                # Na verdade, a atual AINDA NÃO FOI adicionada no histórico do DB (só no next_tactic).
+                # Então precisamos adicionar manualmente aqui para o agente saber que "já fez".
+                if 0 <= current_idx < len(tactics):
+                    current_id = tactics[current_idx]['id']
+                    if current_id not in executed_ids:
+                        executed_ids.append(current_id)
 
         performance_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}/agent_summary")
         performance_summary = performance_res.json().get('summary', 'Sem dados de performance.') if performance_res.status_code == 200 else 'Erro ao buscar performance.'
