@@ -3,6 +3,7 @@ import json
 import logging
 from flask import Blueprint, request, jsonify, current_app
 from config import Config
+from openai import OpenAI
 from google import genai
 from google.genai import types
 
@@ -10,7 +11,7 @@ agente_strategies_bp = Blueprint('agente_strategies_bp', __name__)
 
 # Configuração da API Key
 # Tenta pegar do ambiente (Docker env), ou usa a chave direta como fallback
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 
 # Tenta importar a conexão do banco
@@ -198,7 +199,7 @@ def decide_next_tactic():
         {tactics_joined}
 
         === REGRAS ===
-        1. Olhe para o "Táticas já realizadas". Se o aluno já fez um "Vídeo (ID X)", NÃO escolha outro vídeo agora, tente variar (ex: Quiz ou Leitura), a menos que o desempenho peça reforço.
+        1. Olhe para o "Táticas já realizadas" para não repetir as taticas.
         2. Considere o tempo disponível.
         3. Se o desempenho for RUIM, simplifique. Se for BOM, aprofunde.
 
@@ -234,6 +235,142 @@ def decide_next_tactic():
 
     except Exception as e:
         logging.error(f"Erro no Agente Strategies: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+
+
+
+@agente_strategies_bp.route('/agent/decide_rules_logic', methods=['POST'])
+def decide_rules_logic():
+    """
+    Agente de Regras (Inteligente):
+    - Se Reforço: Escolhe QUAL tática anterior é a melhor para sanar a dúvida.
+    - Se Avanço: Escolhe a próxima estratégia baseada no 'score' (qualidade).
+    """
+    data = request.get_json()
+
+    # --- 1. Extração do Contexto ---
+    performance_summary = data.get('performance_summary', 'Sem dados.')
+    student_profile = data.get('student_profile_summary', 'Perfil desconhecido.')
+    domain_content = data.get('article_text', '')[:800] 
+    
+    current_strategy_id = data.get('strategy_id')
+    executed_tactics_ids = data.get('executed_tactics', [])
+
+    conn = None
+    try:
+        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+        conn = create_connection(db_url)
+        
+        if not conn:
+            return jsonify({"error": "Falha na conexão com o banco"}), 500
+
+        with conn.cursor() as cur:
+            # A. Táticas Já Executadas (Opções para Reforço)
+            # Buscamos Nome e Descrição para o LLM saber o que cada uma faz
+            executed_options = []
+            if executed_tactics_ids:
+                clean_ids = [int(x) for x in executed_tactics_ids]
+                cur.execute("""
+                    SELECT id, name, description 
+                    FROM tactics 
+                    WHERE id = ANY(%s)
+                """, (clean_ids,))
+                rows = cur.fetchall()
+                for r in rows:
+                    r_id = r['id'] if isinstance(r, dict) else r[0]
+                    r_name = r['name'] if isinstance(r, dict) else r[1]
+                    r_desc = r['description'] if isinstance(r, dict) else r[2]
+                    # Formata para o LLM: "ID 1: Nome (Desc)"
+                    executed_options.append(f"- ID {r_id}: {r_name} ({r_desc})")
+
+            # B. Outras Estratégias Disponíveis (Opções para Avanço)
+            # IMPORTANTE: Agora buscamos o 'score' para priorizar as melhores
+            if current_strategy_id:
+                cur.execute("""
+                    SELECT id, name, score 
+                    FROM strategies 
+                    WHERE id != %s
+                    ORDER BY score DESC
+                """, (int(current_strategy_id),))
+                strat_rows = cur.fetchall()
+                available_strategies = []
+                for r in strat_rows:
+                    s_id = r['id'] if isinstance(r, dict) else r[0]
+                    s_name = r['name'] if isinstance(r, dict) else r[1]
+                    s_score = r['score'] if isinstance(r, dict) else r[2]
+                    # Formata: "Estratégia X (ID 10) - Nota: 9"
+                    available_strategies.append(f"- ID {s_id}: {s_name} (Nota de Qualidade: {s_score})")
+            else:
+                available_strategies = ["Nenhuma estratégia extra disponível."]
+
+        # --- 2. Cliente Groq ---
+        if not Config.GROQ_API_KEY:
+             return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
+
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
+        )
+
+        # --- 3. Prompt Avançado ---
+        prompt = f"""
+        Você é o 'Agente de Regras' (Cérebro da Sessão) de um Sistema Tutor Inteligente.
+        
+        === SITUAÇÃO ATUAL ===
+        Perfil da Turma: {student_profile}
+        Desempenho: {performance_summary}
+        Conteúdo: {domain_content}...
+
+        === OPÇÕES DE REFORÇO (Histórico Recente) ===
+        {chr(10).join(executed_options) if executed_options else "Nenhuma tática executada ainda."}
+
+        === OPÇÕES DE PRÓXIMA ESTRATÉGIA (Banco de Estratégias) ===
+        {chr(10).join(available_strategies)}
+
+        === SUA MISSÃO (REGRA DE DECISÃO) ===
+        1. ANALISE O DESEMPENHO:
+           - Se for BAIXO/RUIM: Você DEVE escolher "REPEAT_TACTIC".
+             * **Importante:** Não escolha aleatoriamente. Escolha a tática da lista "OPÇÕES DE REFORÇO" que melhor resolve o problema. 
+             * Exemplo: Se eles não entenderam a teoria, repita a tática de "Reuso". Se faltou tirar duvidas, repita o "Debate Síncrono", "Apresentação Síncrona" ou "Envio de Informação".
+           
+           - Se for ALTO/BOM: Você DEVE escolher "NEXT_STRATEGY".
+             * **Importante:** Escolha a estratégia da lista "OPÇÕES DE PRÓXIMA ESTRATÉGIA" que tiver a MAIOR 'Nota de Qualidade' (Score), a menos que o perfil da turma exija algo específico.
+
+        === SAÍDA (JSON OBRIGATÓRIO) ===
+        {{
+            "decision": "REPEAT_TACTIC" ou "NEXT_STRATEGY",
+            "target_id": <ID inteiro da Tática escolhida ou da Estratégia escolhida>,
+            "target_name": "<Nome da opção escolhida>",
+            "reasoning": "<Explique por que escolheu ESSE ID específico (ex: 'Escolhi a estratégia X pois tem nota 9' ou 'Repeti o Reuso pois a turma falhou na teoria')>"
+        }}
+        """
+
+        # --- 4. Chamada LLM ---
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Responda apenas JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2 
+        )
+
+        content_text = response.choices[0].message.content
+        decision_json = json.loads(content_text)
+
+        return jsonify({
+            "success": True,
+            "rule_execution": decision_json
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Erro no Agente Rules: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
