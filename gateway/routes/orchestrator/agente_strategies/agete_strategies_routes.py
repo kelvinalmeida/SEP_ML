@@ -149,11 +149,19 @@ def execute_rules_logic(session_id):
                     #     if i < current_tactic_index:
                     #         executed_tactics_ids.append(tactic['id'])
 
-                    # NEW LOGIC: Enviar APENAS a tática atual (que acabou de finalizar) como executada.
-                    # Isso previne o loop imediato e permite escolher qualquer outra (anteriores ou futuras).
-                    executed_tactics_ids = []
+                    # NOVO: Usar executed_indices do Control
+                    executed_indices = session_data.get('executed_indices', [])
+
+                    # Mapeia índices para IDs
+                    for idx in executed_indices:
+                        if 0 <= idx < len(strategy_tactics):
+                            executed_tactics_ids.append(strategy_tactics[idx]['id'])
+
+                    # Adiciona a atual (que acabou de finalizar/está em Regra)
                     if 0 <= current_tactic_index < len(strategy_tactics):
-                        executed_tactics_ids.append(strategy_tactics[current_tactic_index]['id'])
+                        current_id = strategy_tactics[current_tactic_index]['id']
+                        if current_id not in executed_tactics_ids:
+                            executed_tactics_ids.append(current_id)
 
         except Exception as e:
             logging.error(f"Erro ao conectar com Strategies: {e}")

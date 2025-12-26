@@ -19,7 +19,7 @@ def execute_agent_logic(session_id, session_json):
         # 1. Dados da Sessão (Control)
         strategy_id = session_json.get('strategies', [None])[0]
 
-        # Inferir táticas executadas
+        # Inferir táticas executadas (usando histórico real do Control)
         executed_ids = []
         if strategy_id:
             strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
@@ -27,18 +27,23 @@ def execute_agent_logic(session_id, session_json):
                 strat_data = strat_res.json()
                 tactics = strat_data.get('tatics', [])
 
-                # CORREÇÃO: Não inferir execução completa baseada no índice (0..current).
-                # Problema 1: Se o agente pula táticas, as anteriores ficam marcadas como 'executadas' e ele não as escolhe.
-                # Problema 2: Se enviarmos lista vazia [], ele não sabe o que ACABOU de fazer e entra em loop repetindo a mesma.
-                # Solução Paliativa: Enviar APENAS a tática atual (que acabou de finalizar) como executada.
-                # Isso previne o loop imediato e permite escolher qualquer outra (anteriores ou futuras).
-
-                executed_ids = []
+                # NOVO: Usar executed_indices do Control
+                executed_indices = session_json.get('executed_indices', [])
                 current_idx = session_json.get('current_tactic_index', 0)
 
+                # Mapeia índices para IDs
+                for idx in executed_indices:
+                    if 0 <= idx < len(tactics):
+                        executed_ids.append(tactics[idx]['id'])
+
+                # Adiciona a atual também, pois ela acabou de ser "feita" no momento da decisão
+                # Evita duplicidade se já estiver no histórico (embora Control adicione no next, aqui estamos decidindo O PRÓXIMO)
+                # Na verdade, a atual AINDA NÃO FOI adicionada no histórico do DB (só no next_tactic).
+                # Então precisamos adicionar manualmente aqui para o agente saber que "já fez".
                 if 0 <= current_idx < len(tactics):
-                    # Adiciona apenas a tática atual à lista de executadas
-                    executed_ids.append(tactics[current_idx]['id'])
+                    current_id = tactics[current_idx]['id']
+                    if current_id not in executed_ids:
+                        executed_ids.append(current_id)
 
         performance_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}/agent_summary")
         performance_summary = performance_res.json().get('summary', 'Sem dados de performance.') if performance_res.status_code == 200 else 'Erro ao buscar performance.'
