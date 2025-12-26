@@ -272,6 +272,7 @@ def start_session(session_id):
 
     with get_db_connection() as conn:
         ensure_end_flag_column(conn)
+        ensure_executed_indices_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -567,6 +568,7 @@ def change_session_strategy(session_id):
 
     with get_db_connection() as conn:
         ensure_end_flag_column(conn)
+        ensure_executed_indices_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -610,6 +612,7 @@ def change_session_domain(session_id):
 
     with get_db_connection() as conn:
         ensure_end_flag_column(conn)
+        ensure_executed_indices_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
