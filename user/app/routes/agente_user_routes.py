@@ -1,7 +1,9 @@
+import json
 import logging
 import os
 from flask import Blueprint, request, jsonify
 from google import genai
+from openai import OpenAI
 from config import Config
 
 # Tentativa de importação relativa ou absoluta do db.py, 
@@ -65,28 +67,57 @@ def summarize_preferences():
 
         # return jsonify({"profiles": profiles_joined}), 200
 
-        # 4. Prompt Atualizado
+        # 1. Prompt Simplificado (Pede apenas texto)
         prompt = f"""
         Atue como um Especialista Pedagógico.
-        Analise estas preferências de aprendizado reais recuperadas do banco de dados:
+        Analise estas preferências de aprendizado reais:
         {profiles_joined}
         
-        Gere um resumo curto (máximo 1 parágrafo) sobre o perfil da turma. 
-        Destaque qual tipo de mídia e canal é o mais efetivo.
-        IMPORTANTE: Cite explicitamente se o uso de email é viável para a maioria ou se deve ser evitado.
+        OBJETIVO:
+        Escreva um parágrafo único e conciso resumindo o perfil da turma.
+        Destaque a mídia e o canal mais efetivos.
+        Diga explicitamente se o e-mail é um canal viável para a maioria.
+
+        FORMATO DE SAÍDA:
+        Apenas o texto corrido, sem formatação JSON, sem markdown e sem títulos.
         """
 
-        client = genai.Client(api_key=Config.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash", 
-            contents=prompt
+        # 4. Chamada LLM (Groq)
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
+        )
+        
+        # 2. Chamada LLM (Sem response_format JSON)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Você é um assistente pedagógico conciso."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2 
+            # response_format removido para permitir texto livre
         )
 
+        content_text = response.choices[0].message.content
+        
+        # Faz o parse da string para um dicionário Python antes de enviar
+        try:
+            summary_dict = json.loads(content_text)
+        except json.JSONDecodeError:
+            # Fallback se a IA falhar
+            summary_dict = {
+                "resumo": content_text,
+                "perfil_turma": {},
+                "uso_email": "Indeterminado"
+            }
+
+        # 4. Retorno (Agora 'summary' será um objeto aninhado, limpo)
         return jsonify({
-            "summary": response.text,
+            "summary": summary_dict,
             "student_count": len(students_data)
         }), 200
-
+    
     except Exception as e:
         logging.error(f"Erro no Agente User: {str(e)}")
         return jsonify({"error": str(e)}), 500

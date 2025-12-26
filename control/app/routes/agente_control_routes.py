@@ -3,6 +3,7 @@ import os
 from flask import Blueprint, request, jsonify, current_app
 from google import genai
 from config import Config
+from openai import OpenAI
 
 # Tenta importar a conexão do banco de dados
 try:
@@ -109,21 +110,40 @@ def agent_session_summary(session_id):
         3. A sessão parece fluir bem ou está estagnada (poucas respostas)?
         """
 
-        # 4. Chamada ao Gemini
-        if not Config.GEMINI_API_KEY:
-             return jsonify({"error": "GEMINI_API_KEY não configurada"}), 500
-
-        client = genai.Client(api_key=Config.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite-preview-09-2025", 
-            contents=prompt
+        # 4. Chamada LLM (Groq)
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
         )
+        
+        # 2. Chamada LLM (Sem response_format JSON)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Você é um assistente pedagógico conciso."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2 
+            # response_format removido para permitir texto livre
+        )
+
+        content_text = response.choices[0].message.content
+
+        # 4. Chamada ao Gemini
+        # if not Config.GEMINI_API_KEY:
+        #      return jsonify({"error": "GEMINI_API_KEY não configurada"}), 500
+
+        # client = genai.Client(api_key=Config.GEMINI_API_KEY)
+        # response = client.models.generate_content(
+        #     model="gemini-2.5-flash-lite-preview-09-2025", 
+        #     contents=prompt
+        # )
 
         # 5. Retorno
         return jsonify({
             "session_id": session_id,
             "status": session_info['status'],
-            "summary": response.text.strip(),
+            "summary": content_text,
             "metrics": {
                 "exercise_avg": round(avg_exercises, 2),
                 "extra_avg": round(avg_extras, 2),
