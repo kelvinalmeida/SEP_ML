@@ -235,6 +235,7 @@ def start_session(session_id):
     use_agent = data.get('use_agent', False)
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -277,6 +278,7 @@ def temp_switch_strategy(session_id):
         return jsonify({"error": "Strategy ID is required"}), 400
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
             session = cur.fetchone()
@@ -517,6 +519,7 @@ def change_session_strategy(session_id):
         return jsonify({"error": "Strategy ID is required"}), 400
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -558,6 +561,7 @@ def change_session_domain(session_id):
         return jsonify({"error": "Domain ID is required"}), 400
 
     with get_db_connection() as conn:
+        ensure_end_flag_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
