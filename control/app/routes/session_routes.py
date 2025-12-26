@@ -71,6 +71,13 @@ def get_session_details(conn, session_id):
         # Ensure use_agent is present in the dict, defaulting to False if not in DB row (handled by SQL default)
         session_dict['use_agent'] = session.get('use_agent', False)
         session_dict['end_on_next_completion'] = session.get('end_on_next_completion', False)
+
+        # Parse executed_indices safely
+        try:
+            session_dict['executed_indices'] = json.loads(session.get('executed_indices', '[]'))
+        except:
+            session_dict['executed_indices'] = []
+
         session_dict['strategies'] = strategies
         session_dict['teachers'] = teachers
         session_dict['students'] = students
@@ -83,15 +90,44 @@ def get_session_details(conn, session_id):
 def ensure_end_flag_column(conn):
     with conn.cursor() as cur:
         try:
-            # Check if column exists to avoid error spam in logs (though IF NOT EXISTS handles it)
-            # Just run the ALTER command, if it fails due to existing, it's fine.
-            # Postgres supports IF NOT EXISTS for ADD COLUMN in newer versions (9.6+)
             cur.execute("ALTER TABLE session ADD COLUMN IF NOT EXISTS end_on_next_completion BOOLEAN DEFAULT FALSE")
             conn.commit()
         except Exception as e:
             conn.rollback()
-            # Ignore duplicate column errors or just log
             logging.warning(f"Note on ensure_end_flag_column: {e}")
+
+def ensure_executed_indices_column(conn):
+    with conn.cursor() as cur:
+        try:
+            cur.execute("ALTER TABLE session ADD COLUMN IF NOT EXISTS executed_indices TEXT DEFAULT '[]'")
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logging.warning(f"Note on ensure_executed_indices_column: {e}")
+
+def update_executed_indices(conn, session_id):
+    """
+    Appends the current_tactic_index to the executed_indices list in DB.
+    Should be called BEFORE updating the index to a new value.
+    """
+    with conn.cursor() as cur:
+        # Get current index and history
+        cur.execute("SELECT current_tactic_index, executed_indices FROM session WHERE id = %s", (session_id,))
+        row = cur.fetchone()
+
+        if row:
+            current_idx = row['current_tactic_index']
+            try:
+                history = json.loads(row['executed_indices'] or '[]')
+            except:
+                history = []
+
+            # Avoid duplicates if it's already the last one (optional, but good for idempotency)
+            if not history or history[-1] != current_idx:
+                history.append(current_idx)
+
+            cur.execute("UPDATE session SET executed_indices = %s WHERE id = %s", (json.dumps(history), session_id))
+            conn.commit()
 
 def _end_session(conn, session_id):
     """
@@ -244,7 +280,7 @@ def start_session(session_id):
             start_time = datetime.utcnow()
             cur.execute("""
                 UPDATE session
-                SET status = 'in-progress', start_time = %s, current_tactic_index = 0, current_tactic_started_at = %s, use_agent = %s, end_on_next_completion = FALSE
+                SET status = 'in-progress', start_time = %s, current_tactic_index = 0, current_tactic_started_at = %s, use_agent = %s, end_on_next_completion = FALSE, executed_indices = '[]'
                 WHERE id = %s
                 RETURNING status, start_time
             """, (start_time, start_time, use_agent, session_id))
@@ -279,6 +315,7 @@ def temp_switch_strategy(session_id):
 
     with get_db_connection() as conn:
         ensure_end_flag_column(conn)
+        ensure_executed_indices_column(conn)
         with conn.cursor() as cur:
             cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
             session = cur.fetchone()
@@ -305,7 +342,8 @@ def temp_switch_strategy(session_id):
                 UPDATE session
                 SET current_tactic_index = 0,
                     current_tactic_started_at = %s,
-                    end_on_next_completion = FALSE
+                    end_on_next_completion = FALSE,
+                    executed_indices = '[]'
                 WHERE id = %s
             """, (start_time, session_id))
 
@@ -317,6 +355,8 @@ def temp_switch_strategy(session_id):
 @session_bp.route('/sessions/tactic/next/<int:session_id>', methods=['POST'])
 def next_tactic(session_id):
     with get_db_connection() as conn:
+        ensure_executed_indices_column(conn)
+
         # Check for end_on_next_completion flag
         end_flag = False
         with conn.cursor() as cur:
@@ -326,12 +366,14 @@ def next_tactic(session_id):
                 if res and res.get('end_on_next_completion'):
                     end_flag = True
             except Exception:
-                # Column likely missing, ignore
                 conn.rollback()
 
         if end_flag:
             _end_session(conn, session_id)
             return jsonify({"success": True, "session_status": "finished", "message": "Session ended by rule."})
+
+        # Update History BEFORE changing index
+        update_executed_indices(conn, session_id)
 
         with conn.cursor() as cur:
             cur.execute("SELECT id, current_tactic_index FROM session WHERE id = %s", (session_id,))
@@ -361,6 +403,11 @@ def set_tactic_index(session_id):
         return jsonify({"error": "tactic_index is required"}), 400
 
     with get_db_connection() as conn:
+        ensure_executed_indices_column(conn)
+
+        # Update History BEFORE changing index
+        update_executed_indices(conn, session_id)
+
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
             if not cur.fetchone():
@@ -543,7 +590,8 @@ def change_session_strategy(session_id):
                     start_time = %s,
                     current_tactic_index = 0,
                     current_tactic_started_at = %s,
-                    end_on_next_completion = FALSE
+                    end_on_next_completion = FALSE,
+                    executed_indices = '[]'
                 WHERE id = %s
             """, (start_time, start_time, session_id))
 
@@ -583,7 +631,8 @@ def change_session_domain(session_id):
                     start_time = %s,
                     current_tactic_index = 0,
                     current_tactic_started_at = %s,
-                    end_on_next_completion = FALSE
+                    end_on_next_completion = FALSE,
+                    executed_indices = '[]'
                 WHERE id = %s
             """, (start_time, start_time, session_id))
 
