@@ -242,12 +242,8 @@ def execute_rules_logic(session_id):
                  try:
                     requests.post(f"{CONTROL_URL}/sessions/{session_id}/temp_switch_strategy", json={"strategy_id": target_id}, timeout=5)
                     action_taken = f"Trocando para estratégia ID {target_id}"
-
-                    # Definir flag para encerrar a sessão após a primeira tática da nova estratégia
-                    try:
-                        requests.post(f"{CONTROL_URL}/sessions/{session_id}/set_end_flag", timeout=5)
-                    except Exception as e:
-                        logging.error(f"Erro ao setar flag de fim de sessão: {e}")
+                    # NOTA: Não definimos 'set_end_flag' aqui.
+                    # Requisito: Se mudar de estratégia, deve executar TODAS as táticas dela, não encerrar na primeira.
 
                  except Exception as e:
                     logging.error(f"Erro ao trocar estratégia no Control: {e}")
