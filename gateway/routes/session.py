@@ -253,6 +253,7 @@ def next_tactic(session_id, current_user=None):
          return jsonify({"error": "Unauthorized"}), 403
 
     try:
+        logging.info(f"⏭️ next_tactic called for session {session_id}")
         # 0. Verifica se o Agente de Estratégia está ativo
         session_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
         if session_res.status_code != 200:
@@ -281,6 +282,7 @@ def next_tactic(session_id, current_user=None):
 
         session_json = session_res.json()
         current_tactic_index = session_json.get("current_tactic_index", 0)
+        logging.info(f"Current tactic index now: {current_tactic_index}")
 
         if not session_json.get('strategies'):
             return (response.text, response.status_code, response.headers.items())
@@ -299,6 +301,7 @@ def next_tactic(session_id, current_user=None):
                 
                 # --- LÓGICA DE DETECÇÃO ---
                 tactic_name = current_tactic['name'].strip().lower()
+                logging.info(f"🔍 Checking tactic logic. Name: '{tactic_name}'")
 
                 # A. Tática de Regra (Agente de Regras)
                 if "regra" in tactic_name:
