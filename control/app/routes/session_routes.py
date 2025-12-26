@@ -70,6 +70,7 @@ def get_session_details(conn, session_id):
         session_dict = dict(session)
         # Ensure use_agent is present in the dict, defaulting to False if not in DB row (handled by SQL default)
         session_dict['use_agent'] = session.get('use_agent', False)
+        session_dict['end_on_next_completion'] = session.get('end_on_next_completion', False)
         session_dict['strategies'] = strategies
         session_dict['teachers'] = teachers
         session_dict['students'] = students
@@ -242,7 +243,7 @@ def start_session(session_id):
             start_time = datetime.utcnow()
             cur.execute("""
                 UPDATE session
-                SET status = 'in-progress', start_time = %s, current_tactic_index = 0, current_tactic_started_at = %s, use_agent = %s
+                SET status = 'in-progress', start_time = %s, current_tactic_index = 0, current_tactic_started_at = %s, use_agent = %s, end_on_next_completion = FALSE
                 WHERE id = %s
                 RETURNING status, start_time
             """, (start_time, start_time, use_agent, session_id))
@@ -301,7 +302,8 @@ def temp_switch_strategy(session_id):
             cur.execute("""
                 UPDATE session
                 SET current_tactic_index = 0,
-                    current_tactic_started_at = %s
+                    current_tactic_started_at = %s,
+                    end_on_next_completion = FALSE
                 WHERE id = %s
             """, (start_time, session_id))
 
@@ -537,7 +539,8 @@ def change_session_strategy(session_id):
                 SET status = 'in-progress',
                     start_time = %s,
                     current_tactic_index = 0,
-                    current_tactic_started_at = %s
+                    current_tactic_started_at = %s,
+                    end_on_next_completion = FALSE
                 WHERE id = %s
             """, (start_time, start_time, session_id))
 
@@ -575,7 +578,8 @@ def change_session_domain(session_id):
                 SET status = 'in-progress',
                     start_time = %s,
                     current_tactic_index = 0,
-                    current_tactic_started_at = %s
+                    current_tactic_started_at = %s,
+                    end_on_next_completion = FALSE
                 WHERE id = %s
             """, (start_time, start_time, session_id))
 
