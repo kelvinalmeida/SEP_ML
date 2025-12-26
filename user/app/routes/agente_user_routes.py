@@ -39,12 +39,21 @@ def summarize_preferences():
         
         with conn.cursor() as cur:
             # 2. Query SQL Atualizada (Incluindo pref_receive_email)
+            # Casting explícito para evitar erro "operator does not exist: integer = text"
+            # O array chega como strings ['1', '2'], mas o banco espera inteiros.
+            try:
+                # Tenta converter para inteiros
+                clean_ids = [int(x) for x in student_ids]
+            except ValueError:
+                # Se falhar (ex: ids alfanuméricos), mantém como string, mas o erro indicava INT no banco.
+                clean_ids = student_ids
+
             query = """
                 SELECT name, pref_content_type, pref_communication, pref_receive_email
                 FROM student 
                 WHERE student_id = ANY(%s)
             """
-            cur.execute(query, (student_ids,))
+            cur.execute(query, (clean_ids,))
             students_data = cur.fetchall()
 
         if not students_data:
