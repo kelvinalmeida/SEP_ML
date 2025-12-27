@@ -75,7 +75,8 @@ INSERT INTO strategies (id, name, score) VALUES
 (2, 'estra 2', 7),
 (3, 'strategia mudandanca de estrategia', 9),
 (4, 'aprender python', 9),
-(5, 'python', 9);
+(5, 'python', 9),
+(6, 'Ruby', 10);
 
 -- 2. Inserir Messages 
 -- CORREÇÃO: Adicionados IDs 4 e 5 que são usados na tabela tactics
@@ -98,7 +99,10 @@ INSERT INTO tactics (id, name, description, time, chat_id, strategy_id) VALUES
 (13, 'Envio de Informacao', 'enviando material por email', 0.2, NULL, 4),
 (14, 'Reuso', 'Veja os vídeos', 0.2, NULL, 5),
 (15, 'Debate Sincrono', 'vamos debater', 0.2, 5, 5),    -- Agora o chat_id 5 existe
-(16, 'Mudanca de Estrategia', '4', 0.2, NULL, 5);
+(16, 'Mudanca de Estrategia', '4', 0.2, NULL, 5),
+(17, 'Reuso', '3', 0.2, NULL, 6),
+(18, 'Debate Sincrono', 'vamos debater', 0.2, 5, 6),
+(19, 'Regra', '3', 0.2, NULL, 6);
 
 -- 4. Inserir General Messages
 INSERT INTO general_message (id, username, content, timestamp, message_id) VALUES 
