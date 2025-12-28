@@ -33,6 +33,15 @@ CREATE TABLE teacher(
     PRIMARY KEY (teacher_id)
 );
 
+CREATE TABLE student_feedback (
+    id SERIAL PRIMARY KEY,
+    student_username VARCHAR(100) NOT NULL,
+    session_id INTEGER, -- Opcional, para saber de qual aula foi
+    domain_name VARCHAR(100),
+    feedback_content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ==========================================================
 -- 2. DML: POPULAÇÃO DOS DADOS (INSERTS)
 -- ==========================================================

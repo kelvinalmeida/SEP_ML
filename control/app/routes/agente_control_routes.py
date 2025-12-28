@@ -157,3 +157,74 @@ def agent_session_summary(session_id):
     finally:
         if conn:
             conn.close()
+
+
+@agente_control_bp.route('/sessions/<int:session_id>/fetch_all_grades', methods=['GET'])
+def get_all_session_grades(session_id):
+    """
+    Retorna um dicionário com TODAS as notas e notas extras da sessão,
+    usando o username do aluno como chave.
+    
+    Não requer JSON de entrada, apenas o ID na URL.
+    """
+    conn = None
+    try:
+        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+        conn = create_connection(db_url)
+        
+        if not conn:
+            return jsonify({"error": "Falha na conexão com o banco"}), 500
+
+        with conn.cursor() as cur:
+            data_map = {}
+
+            # ---------------------------------------------------------
+            # 1. Buscar Notas de Exercícios (Verified Answers)
+            # ---------------------------------------------------------
+            cur.execute("""
+                SELECT student_name, score 
+                FROM verified_answers 
+                WHERE session_id = %s
+            """, (session_id,))
+            
+            answers = cur.fetchall()
+            for row in answers:
+                # Tratamento para Dicionário (RealDictCursor) ou Tupla
+                s_name = row['student_name'] if isinstance(row, dict) else row[0]
+                val = row['score'] if isinstance(row, dict) else row[1]
+                
+                # Se o aluno ainda não está no mapa, inicializa
+                if s_name not in data_map:
+                    data_map[s_name] = {"notes": [], "extra_notes": []}
+                
+                data_map[s_name]["notes"].append(val)
+
+            # ---------------------------------------------------------
+            # 2. Buscar Notas Extras (Extra Notes)
+            # ---------------------------------------------------------
+            cur.execute("""
+                SELECT estudante_username, extra_notes 
+                FROM extra_notes 
+                WHERE session_id = %s
+            """, (session_id,))
+            
+            extras = cur.fetchall()
+            for row in extras:
+                # Tratamento para Dicionário (RealDictCursor) ou Tupla
+                s_name = row['estudante_username'] if isinstance(row, dict) else row[0]
+                val = row['extra_notes'] if isinstance(row, dict) else row[1]
+                
+                # Se o aluno apareceu aqui mas não nos exercícios, inicializa
+                if s_name not in data_map:
+                    data_map[s_name] = {"notes": [], "extra_notes": []}
+                
+                data_map[s_name]["extra_notes"].append(val)
+
+        return jsonify(data_map), 200
+
+    except Exception as e:
+        logging.error(f"Erro ao buscar todas as notas da sessão {session_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()

@@ -425,3 +425,89 @@ def decide_rules_logic():
     finally:
         if conn:
             conn.close()
+
+
+@agente_strategies_bp.route('/tactics/<int:tactic_id>/chat_logs', methods=['GET'])
+def get_chat_logs(tactic_id):
+    """
+    Busca TODOS os logs de chat (Geral e Privado) de uma tática específica,
+    agrupados por username.
+    
+    Entrada: ID da tática via URL.
+    Saída: Dicionário { "username": { "general": [], "private": [] } }
+    """
+    conn = None
+    try:
+        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+        conn = create_connection(db_url)
+        
+        if not conn:
+            return jsonify({"error": "Falha na conexão com o banco"}), 500
+
+        with conn.cursor() as cur:
+            # 1. Descobrir qual é o ID da sala de chat (message_id) da Tática
+            cur.execute("SELECT chat_id FROM tactics WHERE id = %s", (tactic_id,))
+            row = cur.fetchone()
+            
+            if not row:
+                return jsonify({}), 200
+            
+            # Tratamento seguro Dict vs Tupla para obter o chat_id
+            if isinstance(row, dict): 
+                chat_room_id = row.get('chat_id')
+            else:
+                chat_room_id = row[0]
+
+            # Se a tática existe mas não tem chat vinculado
+            if chat_room_id is None:
+                return jsonify({}), 200
+
+            # Inicializa estrutura de resposta
+            chat_map = {}
+
+            # 2. Buscar TODAS as Mensagens Gerais da sala
+            cur.execute("""
+                SELECT username, content 
+                FROM general_message 
+                WHERE message_id = %s 
+                ORDER BY timestamp ASC
+            """, (chat_room_id,))
+            
+            general_msgs = cur.fetchall()
+            for gm in general_msgs:
+                u_name = gm['username'] if isinstance(gm, dict) else gm[0]
+                content = gm['content'] if isinstance(gm, dict) else gm[1]
+                
+                if u_name not in chat_map:
+                    chat_map[u_name] = {"general": [], "private": []}
+                
+                chat_map[u_name]["general"].append(content)
+
+            # 3. Buscar TODAS as Mensagens Privadas da sala
+            cur.execute("""
+                SELECT username, target_username, content 
+                FROM private_message 
+                WHERE message_id = %s 
+                ORDER BY timestamp ASC
+            """, (chat_room_id,))
+            
+            private_msgs = cur.fetchall()
+            for pm in private_msgs:
+                sender = pm['username'] if isinstance(pm, dict) else pm[0]
+                target = pm['target_username'] if isinstance(pm, dict) else pm[1]
+                content = pm['content'] if isinstance(pm, dict) else pm[2]
+                
+                if sender not in chat_map:
+                    chat_map[sender] = {"general": [], "private": []}
+                
+                formatted_msg = f"(Para {target}): {content}"
+                chat_map[sender]["private"].append(formatted_msg)
+
+        return jsonify(chat_map), 200
+
+    except Exception as e:
+        logging.error(f"Erro ao buscar logs de chat da tática {tactic_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()

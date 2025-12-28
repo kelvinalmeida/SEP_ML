@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from google import genai
 from openai import OpenAI
 from config import Config
@@ -129,6 +129,138 @@ def summarize_preferences():
     
     except Exception as e:
         logging.error(f"Erro no Agente User: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+
+@agente_user_bp.route('/agent/generate_student_feedback', methods=['POST'])
+def generate_student_feedback():
+    """
+    Gera um conselho pedagógico personalizado para o aluno.
+    
+    Payload Esperado:
+    {
+        "student_username": "kelvin",
+        "session_id": 1,
+        "domain": {
+            "name": "Introdução a Python",
+            "description": "Conceitos básicos de variáveis e loops"
+        },
+        "performance_data": { "notes": [80], "extra_notes": [1.0] },  <-- Do Control
+        "chat_logs": { "general": ["Dúvida aqui"], "private": [] },   <-- Do Strategies
+        "preferences": {                                              <-- Do User
+            "pref_content_type": "exemplos",
+            "pref_communication": "chat",
+            "pref_receive_email": true
+        }
+    }
+    """
+    data = request.get_json()
+    conn = None
+
+    try:
+        # 1. Extração de Dados
+        username = data.get('student_username')
+        session_id = data.get('session_id')
+        domain = data.get('domain', {})
+        performance = data.get('performance_data', {})
+        chat = data.get('chat_logs', {})
+        prefs = data.get('preferences', {})
+
+        if not username:
+            return jsonify({"error": "student_username é obrigatório"}), 400
+
+        # 2. Configuração LLM
+        if not Config.GROQ_API_KEY:
+             return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
+
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
+        )
+
+        # 3. Prompt
+        prompt = f"""
+        Atue como um Mentor Pedagógico Pessoal.
+        Seu objetivo é dar um conselho curto e direto para o aluno melhorar seu desempenho.
+
+        CONTEXTO DA AULA:
+        - Tema: {domain.get('name', 'N/A')}
+        - Descrição: {domain.get('description', 'N/A')}
+
+        PERFIL DO ALUNO ({username}):
+        - Prefere conteúdo do tipo: {prefs.get('pref_content_type', 'Indiferente')}
+        - Prefere comunicação via: {prefs.get('pref_communication', 'Indiferente')}
+        - Aceita dicas por email: {'Sim' if prefs.get('pref_receive_email') else 'Não'}
+
+        DESEMPENHO:
+        - Notas: {performance.get('notes', [])}
+        - Extras: {performance.get('extra_notes', [])}
+
+        CHAT:
+        - Interações Gerais: {len(chat.get('general', []))}
+        - Interações Privadas: {len(chat.get('private', []))}
+
+        TAREFA:
+        Escreva um feedback de 1 parágrafo (em português).
+        1. Elogie pontos fortes.
+        2. Aponte onde melhorar.
+        3. Dê uma dica de estudo baseada na preferência dele.
+        """
+
+        # 4. Chamada LLM
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Você é um tutor amigável e motivador."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4,
+            max_tokens=300
+        )
+
+        feedback_text = response.choices[0].message.content
+
+        # 5. Salvar no Banco de Dados (Correção Aqui)
+        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+        conn = create_connection(db_url)
+        
+        new_id = None
+        if conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO student_feedback 
+                    (student_username, session_id, domain_name, feedback_content)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                """, (username, session_id, domain.get('name'), feedback_text))
+                
+                new_row = cur.fetchone()
+                
+                # --- LÓGICA DE EXTRAÇÃO SEGURA ---
+                if new_row:
+                    if isinstance(new_row, dict):
+                        # Se for dicionário (RealDictCursor)
+                        new_id = new_row['id']
+                    else:
+                        # Se for Tupla
+                        new_id = new_row[0]
+                
+                conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "student": username,
+            "feedback": feedback_text,
+            "feedback_id": new_id
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Erro ao gerar feedback: {str(e)}")
+        # Dica: Se retornar '0' aqui, é o KeyError capturado
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
