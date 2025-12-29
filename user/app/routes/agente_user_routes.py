@@ -13,6 +13,20 @@ except ImportError:
 
 agente_user_bp = Blueprint('agente_user_bp', __name__)
 
+def ensure_tutor_chat_table(conn):
+    """Garante que a tabela de histórico do tutor existe."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tutor_chat_history (
+                id SERIAL PRIMARY KEY,
+                student_username VARCHAR(100) NOT NULL,
+                sender VARCHAR(20) NOT NULL,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+
 @agente_user_bp.route('/students/summarize_preferences', methods=['POST'])
 def summarize_preferences():
     """
@@ -119,7 +133,7 @@ def summarize_preferences():
 def generate_student_feedback():
     """
     Gera um feedback ou resposta para o aluno baseada no prompt e contexto agregado.
-    Adaptação para receber payload agregado do Gateway.
+    Salva o histórico da conversa.
     """
     data = request.get_json() or {}
     conn = None
@@ -133,12 +147,15 @@ def generate_student_feedback():
         if not username:
             return jsonify({"error": "student_username é obrigatório"}), 400
 
-        # 2. Conectar ao Banco para buscar Preferências (Perfil do Aluno)
+        # 2. Conectar ao Banco
         db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
         conn = create_connection(db_url)
 
         prefs = {}
         if conn:
+            ensure_tutor_chat_table(conn)
+
+            # Busca perfil
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT pref_content_type, pref_communication, pref_receive_email
@@ -147,6 +164,15 @@ def generate_student_feedback():
                 row = cur.fetchone()
                 if row:
                     prefs = dict(row)
+
+            # SALVA MENSAGEM DO USUÁRIO
+            if user_prompt:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO tutor_chat_history (student_username, sender, message)
+                        VALUES (%s, 'user', %s)
+                    """, (username, str(user_prompt)))
+                    conn.commit()
 
         # 3. Configuração LLM
         if not Config.GROQ_API_KEY:
@@ -177,10 +203,9 @@ def generate_student_feedback():
                     context_str += "Materiais de Apoio (PDFs):\n"
                     for p in pdfs:
                         fname = p.get('filename', 'arquivo.pdf')
-                        # pdf_content inserido pelo Gateway
                         preview = p.get('pdf_content', '')
                         if len(preview) > 200:
-                            preview = preview[:200] + "..." # Limita para não estourar tokens
+                            preview = preview[:200] + "..."
 
                         context_str += f"  - Arquivo: {fname}\n"
                         if preview:
@@ -189,7 +214,6 @@ def generate_student_feedback():
                 # Sessões
                 for sess in d_info.get('sessions_history', []):
                     sess_id = sess.get('session_id')
-                    # Guardamos o último ID encontrado para salvar no banco (melhor esforço)
                     last_session_id = sess_id
                     last_domain_name = d_name
 
@@ -238,11 +262,19 @@ def generate_student_feedback():
 
         feedback_text = response.choices[0].message.content
 
-        # 6. Salvar no Banco (Se tiver conexão e contexto mínimo)
+        # 6. Salvar no Banco (Feedback + Mensagem Chat)
         new_id = None
         if conn and feedback_text:
             try:
-                # Se last_session_id for string, tenta converter para int pois o banco espera INT
+                # Salva na tabela chat history
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO tutor_chat_history (student_username, sender, message)
+                        VALUES (%s, 'agent', %s)
+                    """, (username, feedback_text))
+                    conn.commit()
+
+                # Salva na tabela student_feedback (Legacy/Structured) se tiver dados
                 sid_to_save = None
                 if last_session_id:
                     try:
@@ -266,7 +298,7 @@ def generate_student_feedback():
                             new_id = new_row[0]
                     conn.commit()
             except Exception as db_err:
-                logging.warning(f"Não foi possível salvar feedback no banco: {db_err}")
+                logging.warning(f"Erro ao salvar no banco: {db_err}")
 
         return jsonify({
             "status": "success",
@@ -282,18 +314,80 @@ def generate_student_feedback():
         if conn:
             conn.close()
 
+@agente_user_bp.route('/agent/chat_history', methods=['GET'])
+def get_chat_history():
+    """Retorna o histórico de conversas do tutor."""
+    username = request.args.get('username')
+    if not username:
+        return jsonify({"error": "Username required"}), 400
+
+    conn = None
+    try:
+        db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
+        conn = create_connection(db_url)
+        if not conn:
+             return jsonify({"error": "DB Error"}), 500
+
+        ensure_tutor_chat_table(conn)
+
+        history = []
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT sender, message, created_at
+                FROM tutor_chat_history
+                WHERE student_username = %s
+                ORDER BY created_at ASC
+            """, (username,))
+            rows = cur.fetchall()
+            for r in rows:
+                history.append({
+                    "sender": r['sender'],
+                    "message": r['message'],
+                    "timestamp": r['created_at'].isoformat() if r['created_at'] else None
+                })
+
+        return jsonify(history), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn: conn.close()
+
+@agente_user_bp.route('/agent/chat_history', methods=['DELETE'])
+def clear_chat_history():
+    """Limpa o histórico de conversas."""
+    username = request.args.get('username')
+    if not username:
+        return jsonify({"error": "Username required"}), 400
+
+    conn = None
+    try:
+        db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
+        conn = create_connection(db_url)
+        if not conn:
+             return jsonify({"error": "DB Error"}), 500
+
+        ensure_tutor_chat_table(conn)
+
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM tutor_chat_history WHERE student_username = %s", (username,))
+            conn.commit()
+
+        return jsonify({"status": "cleared"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn: conn.close()
+
 
 @agente_user_bp.route('/agent/help_student', methods=['POST'])
 def help_student_agent():
     """
-    Rota legada/alternativa. Mantida para compatibilidade se necessário.
+    Rota legada.
     """
     try:
         data = request.get_json()
         username = data.get('student_username')
         user_prompt = data.get('user_prompt')
-        profile = data.get('student_profile', {})
-        history = data.get('session_history', {})
         
         if not Config.GROQ_API_KEY:
              return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
@@ -302,22 +396,12 @@ def help_student_agent():
             api_key=Config.GROQ_API_KEY,
             base_url="https://api.groq.com/openai/v1"
         )
-
-        context_text = ""
-        if history:
-            context_text += "HISTÓRICO:\n"
-            for sess_id, info in history.items():
-                domain = info.get('domain', {})
-                grades = info.get('grades', {})
-                context_text += f"Sessão {sess_id}: {domain.get('title')} - Notas: {grades.get('notes')}\n"
         
-        system_prompt = f"Tutor Inteligente para {username}. Contexto: {context_text}"
-
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "system", "content": "Tutor Inteligente."},
+                {"role": "user", "content": str(user_prompt)}
             ],
             temperature=0.5
         )
