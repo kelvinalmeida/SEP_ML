@@ -4,6 +4,8 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from ...services_routs import STRATEGIES_URL, DOMAIN_URL, CONTROL_URL, USER_URL
 from ...auth import token_required
+import io
+from pypdf import PdfReader
 
 agete_user_bp = Blueprint('agete_user_bp', __name__)
 
@@ -20,7 +22,8 @@ def ask_tutor(current_user):
     Rota reescrita para agregar contexto de estudo e consultar o Agente User.
     1. Coleta Notas (Control) e Chats (Strategies) em paralelo.
     2. Agrega Metadados de Sessão, Domínio e Táticas.
-    3. Envia Payload consolidado para o serviço User (/agent/generate_student_feedback).
+    3. Extrai conteúdo inicial dos PDFs do domínio.
+    4. Envia Payload consolidado para o serviço User (/agent/generate_student_feedback).
     """
 
     # 1. Obter Username e Prompt
@@ -102,29 +105,54 @@ def ask_tutor(current_user):
 
             # Inicializa grupo do domínio se não existir
             if domain_name not in study_context:
+
+                # Processamento de PDFs
+                processed_pdfs = []
+                for pdf in domain_info.get('pdfs', []):
+                    pdf_entry = {"filename": pdf.get('filename')}
+                    try:
+                        # Tenta baixar o PDF para extrair texto
+                        pdf_id = pdf.get('id')
+                        if pdf_id:
+                             # Endpoint do Domain Service para baixar PDF
+                             pdf_resp = requests.get(f"{DOMAIN_URL}/pdfs/{pdf_id}", timeout=10)
+                             if pdf_resp.status_code == 200:
+                                 # Lê o binário
+                                 reader = PdfReader(io.BytesIO(pdf_resp.content))
+                                 text_preview = ""
+                                 # Extrai texto da primeira página se houver
+                                 if len(reader.pages) > 0:
+                                     full_text = reader.pages[0].extract_text() or ""
+                                     # Pega apenas as primeiras 10 linhas
+                                     lines = full_text.split('\n')
+                                     text_preview = "\n".join(lines[:10])
+
+                                 pdf_entry["pdf_content"] = text_preview
+                             else:
+                                 pdf_entry["pdf_content"] = "Não foi possível baixar o conteúdo."
+                        else:
+                             pdf_entry["pdf_content"] = "ID do PDF não encontrado."
+
+                    except Exception as e:
+                        logging.warning(f"Erro ao processar PDF {pdf.get('filename')}: {e}")
+                        pdf_entry["pdf_content"] = "Erro na leitura do PDF."
+
+                    processed_pdfs.append(pdf_entry)
+
                 study_context[domain_name] = {
                     "description": domain_info.get('description', ''),
                     "material_complementar": {
-                        "pdfs": domain_info.get('pdfs', []),
-                        "videos": []
+                        "pdfs": processed_pdfs
+                        # "videos" REMOVIDO conforme solicitação
                     },
                     "sessions_history": []
                 }
-
-                # Popula videos
-                video_list = []
-                for v in domain_info.get('videos_youtube', []):
-                    video_list.append({"url": v.get('url'), "type": "youtube", "title": v.get('title', 'Video Youtube')})
-                for v in domain_info.get('videos_uploaded', []):
-                    video_list.append({"url": v.get('filename'), "type": "upload", "title": v.get('filename')})
-
-                study_context[domain_name]["material_complementar"]["videos"] = video_list
 
             # 3.3 Identificar Estratégia
             strategy_id = session_meta.get('original_strategy_id')
             if not strategy_id and session_meta.get('strategies'):
                 strategy_id = session_meta['strategies'][0]
-            
+
             strategy_id = str(strategy_id) if strategy_id else None
 
             # 3.4 Buscar Táticas e Filtrar Chats
