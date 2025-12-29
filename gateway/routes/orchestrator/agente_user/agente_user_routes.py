@@ -204,6 +204,8 @@ def ask_tutor(current_user):
         "study_context": study_context
     }
 
+    # return jsonify(final_payload), 200
+
     # ------------------------------------------------------------------
     # 5. Enviar para Agente User (Serviço Externo)
     # ------------------------------------------------------------------
