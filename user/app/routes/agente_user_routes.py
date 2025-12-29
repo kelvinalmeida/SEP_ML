@@ -169,12 +169,22 @@ def generate_student_feedback():
                 context_str += f"\n=== Domínio: {d_name} ===\n"
                 context_str += f"Descrição: {d_info.get('description', '')}\n"
 
-                # Materiais
+                # Materiais (PDF apenas, Videos removidos)
                 mats = d_info.get('material_complementar', {})
-                pdfs = [p.get('filename') for p in mats.get('pdfs', [])]
-                videos = [v.get('title') for v in mats.get('videos', [])]
-                if pdfs: context_str += f"Materiais PDF: {', '.join(pdfs)}\n"
-                if videos: context_str += f"Vídeos: {', '.join(videos)}\n"
+                pdfs = mats.get('pdfs', [])
+
+                if pdfs:
+                    context_str += "Materiais de Apoio (PDFs):\n"
+                    for p in pdfs:
+                        fname = p.get('filename', 'arquivo.pdf')
+                        # pdf_content inserido pelo Gateway
+                        preview = p.get('pdf_content', '')
+                        if len(preview) > 200:
+                            preview = preview[:200] + "..." # Limita para não estourar tokens
+
+                        context_str += f"  - Arquivo: {fname}\n"
+                        if preview:
+                             context_str += f"    Trecho Inicial: {preview}\n"
 
                 # Sessões
                 for sess in d_info.get('sessions_history', []):
@@ -210,7 +220,7 @@ def generate_student_feedback():
 
         SUA TAREFA:
         Responda ao PROMPT DO USUÁRIO abaixo.
-        1. Se for uma dúvida, responda usando o contexto (se relevante).
+        1. Se for uma dúvida, responda usando o contexto (especialmente trechos de PDF se houver).
         2. Se for um pedido de feedback, analise o desempenho nas sessões listadas.
         3. Adapte a resposta ao perfil do aluno.
         4. Seja encorajador e direto.
@@ -278,9 +288,6 @@ def help_student_agent():
     """
     Rota legada/alternativa. Mantida para compatibilidade se necessário.
     """
-    # ... (mesma implementação anterior ou redireciona para a nova)
-    # Por segurança, mantemos o código original desta função se ele for usado por outros componentes.
-    # Vou replicar o código original que estava aqui para não quebrar nada.
     try:
         data = request.get_json()
         username = data.get('student_username')
