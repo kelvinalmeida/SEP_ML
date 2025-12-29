@@ -121,8 +121,11 @@
         <div class="container mt-5 mb-5">
             <div class="card shadow">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Tutor Virtual (Worker User)</h5>
-                    <small>IA Pedagógica</small>
+                    <div class="d-flex align-items-center">
+                        <h5 class="mb-0 me-2">Tutor Virtual (Worker User)</h5>
+                        <small>IA Pedagógica</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-light" onclick="clearChat()">Limpar Chat</button>
                 </div>
                 <div class="card-body" id="chat-box" style="height: 400px; overflow-y: auto; background-color: #e9ecef;">
                     <!-- Mensagens -->
@@ -159,47 +162,88 @@
             }
         });
 
+        // Carregar histórico ao iniciar
+        document.addEventListener('DOMContentLoaded', loadChatHistory);
+
+        async function loadChatHistory() {
+            try {
+                const response = await fetch('/orchestrator/student/chat_history');
+                if (response.ok) {
+                    const history = await response.json();
+                    if (Array.isArray(history) && history.length > 0) {
+                        if(placeholder) placeholder.style.display = 'none';
+                        history.forEach(msg => {
+                            appendMessage(msg.sender, msg.message);
+                        });
+                        // Scroll to bottom
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao carregar histórico", e);
+            }
+        }
+
+        async function clearChat() {
+            if (!confirm("Tem certeza que deseja apagar todo o histórico?")) return;
+
+            try {
+                const response = await fetch('/orchestrator/student/chat_history', { method: 'DELETE' });
+                if (response.ok) {
+                    chatBox.innerHTML = '';
+                    // Recria o placeholder
+                    const newPlaceholder = document.createElement('div');
+                    newPlaceholder.id = 'chat-placeholder';
+                    newPlaceholder.className = 'text-center text-muted mt-5';
+                    newPlaceholder.innerHTML = `
+                        <p class="mb-1">👋 Histórico limpo!</p>
+                        <p>Comece uma nova conversa.</p>
+                    `;
+                    chatBox.appendChild(newPlaceholder);
+                    placeholder = newPlaceholder; // Update reference if needed, though placeholder var is const (oops)
+                    // Better just reload or reset visibility logic
+                    location.reload();
+                } else {
+                    alert("Erro ao limpar chat.");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao limpar chat.");
+            }
+        }
+
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text) return;
 
-            // Esconde placeholder
             if(placeholder) placeholder.style.display = 'none';
 
-            // 1. Mensagem do Usuário
+            // 1. Mensagem do Usuário (Append only, saved by backend)
             appendMessage('user', text);
             userInput.value = '';
             setLoading(true);
 
-            // 2. Mensagem de Carregamento
             const loadingId = appendMessage('system', 'Consultando seus dados e gerando resposta...');
 
             try {
-                // Chama a rota de orquestração que agrega dados e consulta o User Worker
                 const response = await fetch('/orchestrator/student/ask_tutor', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt: text })
                 });
 
                 const data = await response.json();
-
-                // Remove loading
                 removeMessage(loadingId);
 
                 if (response.ok) {
-                    appendMessage('agent', data.response || "Recebi sua mensagem, mas não tive resposta textual.");
+                    appendMessage('agent', data.response || "Sem resposta textual.");
                 } else {
-                    console.error("Erro:", data);
-                    appendMessage('error', 'Erro: ' + (data.error || 'Falha na comunicação.'));
+                    appendMessage('error', 'Erro: ' + (data.error || 'Falha.'));
                 }
 
             } catch (error) {
-                console.error("Erro de rede:", error);
                 removeMessage(loadingId);
-                appendMessage('error', 'Erro de conexão com o servidor.');
+                appendMessage('error', 'Erro de conexão.');
             } finally {
                 setLoading(false);
                 userInput.focus();
@@ -233,10 +277,10 @@
             } else {
                 msgDiv.className = `p-3 rounded-3 ${bubbleClass}`;
                 msgDiv.style.maxWidth = '75%';
-                msgDiv.style.whiteSpace = 'pre-wrap'; // Preserva quebras de linha
+                msgDiv.style.whiteSpace = 'pre-wrap';
 
                 if (sender === 'agent') {
-                    msgDiv.innerHTML = '<strong>🤖 Tutor:</strong><br>' + text; // Usando HTML para formatar se vier markdown simples
+                    msgDiv.innerHTML = '<strong>🤖 Tutor:</strong><br>' + text;
                 } else if (sender === 'error') {
                      msgDiv.innerHTML = '<strong>⚠️ Erro:</strong><br>' + text;
                 } else {
@@ -248,7 +292,6 @@
             msgRow.appendChild(msgDiv);
             chatBox.appendChild(msgRow);
             chatBox.scrollTop = chatBox.scrollHeight;
-
             return msgRow.id;
         }
 
