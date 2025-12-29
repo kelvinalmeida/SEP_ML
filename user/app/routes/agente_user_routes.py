@@ -265,3 +265,95 @@ def generate_student_feedback():
     finally:
         if conn:
             conn.close()
+
+
+
+@agente_user_bp.route('/agent/help_student', methods=['POST'])
+def help_student_agent():
+    """
+    Recebe o contexto consolidado do aluno (perfil, notas, chats, domínios)
+    e usa a LLM para responder à dúvida atual.
+    """
+    try:
+        data = request.get_json()
+        
+        # 1. Extração dos Dados Enviados pelo Orquestrador
+        username = data.get('student_username')
+        user_prompt = data.get('user_prompt')
+        profile = data.get('student_profile', {})
+        history = data.get('session_history', {}) # Aquele dicionário complexo por sessão
+        
+        # 2. Configuração do Cliente LLM (Groq)
+        if not Config.GROQ_API_KEY:
+             return jsonify({"error": "GROQ_API_KEY não configurada no User Service"}), 500
+
+        client = OpenAI(
+            api_key=Config.GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1"
+        )
+
+        # 3. Construção do Contexto Histórico para a IA
+        # Vamos transformar o JSON de histórico em um texto legível para a LLM
+        context_text = ""
+        if history:
+            context_text += "HISTÓRICO DE AULAS DO ALUNO:\n"
+            for sess_id, info in history.items():
+                domain = info.get('domain', {})
+                grades = info.get('grades', {})
+                chats = info.get('chats', [])
+                
+                context_text += f"- Sessão {sess_id}: Tópico '{domain.get('title', 'N/A')}'.\n"
+                context_text += f"  Descrição: {domain.get('body', '')}\n"
+                context_text += f"  Desempenho: Notas {grades.get('notes')} | Extras {grades.get('extra_notes')}\n"
+                
+                if chats:
+                    context_text += "  Interações no Chat desta aula:\n"
+                    for chat_block in chats:
+                        msgs = chat_block.get('data', {})
+                        if msgs.get('general'):
+                            context_text += f"    * Geral: {msgs['general']}\n"
+                        if msgs.get('private'):
+                            context_text += f"    * Dúvidas Privadas: {msgs['private']}\n"
+                context_text += "\n"
+        else:
+            context_text = "O aluno ainda não tem histórico de aulas registradas.\n"
+
+        # 4. Construção do Prompt do Sistema
+        system_prompt = f"""
+        Você é um Tutor Inteligente Personalizado. O aluno {username} está pedindo ajuda.
+        
+        PERFIL DO ALUNO:
+        - Prefere conteúdo: {profile.get('content_pref')}
+        - Estilo de comunicação: {profile.get('comm_pref')}
+        
+        {context_text}
+        
+        SUA MISSÃO:
+        Responda à dúvida do aluno de forma didática.
+        1. Use o histórico (se relevante) para conectar a dúvida atual com o que ele já estudou ou errou antes.
+        2. Adapte a explicação ao perfil dele (ex: se gosta de 'exemplos', dê código; se 'teoria', explique conceitos).
+        3. Seja encorajador.
+        """
+
+        # 5. Chamada à LLM
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile", # Ou outro modelo disponivel no Groq
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=800
+        )
+
+        ai_message = response.choices[0].message.content
+
+        return jsonify({
+            "status": "success",
+            "student": username,
+            "response": ai_message
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Erro no Agente User (Help Student): {str(e)}")
+        return jsonify({"error": str(e)}), 500

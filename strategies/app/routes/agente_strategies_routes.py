@@ -427,14 +427,21 @@ def decide_rules_logic():
             conn.close()
 
 
-@agente_strategies_bp.route('/tactics/<int:tactic_id>/chat_logs', methods=['GET'])
-def get_chat_logs(tactic_id):
+@agente_strategies_bp.route('/students/<string:username>/chat_history', methods=['GET'])
+def get_student_chat_history(username):
     """
-    Busca TODOS os logs de chat (Geral e Privado) de uma tática específica,
-    agrupados por username.
+    Retorna todo o histórico de chat (Geral e Privado) de um aluno,
+    agrupado pelo ID DA TÁTICA.
     
-    Entrada: ID da tática via URL.
-    Saída: Dicionário { "username": { "general": [], "private": [] } }
+    Estrutura de Retorno:
+    {
+        "tactic_id_1": {
+            "tactic_name": "Debate Sincrono",
+            "general": ["msg1", "msg2"],
+            "private": ["(Para Professor): duvida"]
+        },
+        "tactic_id_5": { ... }
+    }
     """
     conn = None
     try:
@@ -445,68 +452,71 @@ def get_chat_logs(tactic_id):
             return jsonify({"error": "Falha na conexão com o banco"}), 500
 
         with conn.cursor() as cur:
-            # 1. Descobrir qual é o ID da sala de chat (message_id) da Tática
-            cur.execute("SELECT chat_id FROM tactics WHERE id = %s", (tactic_id,))
-            row = cur.fetchone()
-            
-            if not row:
-                return jsonify({}), 200
-            
-            # Tratamento seguro Dict vs Tupla para obter o chat_id
-            if isinstance(row, dict): 
-                chat_room_id = row.get('chat_id')
-            else:
-                chat_room_id = row[0]
+            # Dicionário principal: Chave será o ID da Tática (String)
+            history_map = {}
 
-            # Se a tática existe mas não tem chat vinculado
-            if chat_room_id is None:
-                return jsonify({}), 200
-
-            # Inicializa estrutura de resposta
-            chat_map = {}
-
-            # 2. Buscar TODAS as Mensagens Gerais da sala
+            # ---------------------------------------------------------
+            # 1. Buscar Mensagens Gerais (Com JOIN na tabela Tactics)
+            # ---------------------------------------------------------
+            # Precisamos do JOIN para saber qual é o tactic_id associado ao chat (message_id)
             cur.execute("""
-                SELECT username, content 
-                FROM general_message 
-                WHERE message_id = %s 
-                ORDER BY timestamp ASC
-            """, (chat_room_id,))
+                SELECT t.id as tactic_id, t.name as tactic_name, gm.content 
+                FROM general_message gm
+                JOIN tactics t ON gm.message_id = t.chat_id
+                WHERE gm.username = %s
+                ORDER BY gm.timestamp ASC
+            """, (username,))
             
-            general_msgs = cur.fetchall()
-            for gm in general_msgs:
-                u_name = gm['username'] if isinstance(gm, dict) else gm[0]
-                content = gm['content'] if isinstance(gm, dict) else gm[1]
+            gen_rows = cur.fetchall()
+            for row in gen_rows:
+                # Tratamento seguro (Dict vs Tupla)
+                tid = str(row['tactic_id'] if isinstance(row, dict) else row[0])
+                tname = row['tactic_name'] if isinstance(row, dict) else row[1]
+                content = row['content'] if isinstance(row, dict) else row[2]
                 
-                if u_name not in chat_map:
-                    chat_map[u_name] = {"general": [], "private": []}
+                # Inicializa a tática no mapa se não existir
+                if tid not in history_map:
+                    history_map[tid] = {
+                        "tactic_name": tname,
+                        "general": [], 
+                        "private": []
+                    }
                 
-                chat_map[u_name]["general"].append(content)
+                history_map[tid]["general"].append(content)
 
-            # 3. Buscar TODAS as Mensagens Privadas da sala
+            # ---------------------------------------------------------
+            # 2. Buscar Mensagens Privadas (Com JOIN na tabela Tactics)
+            # ---------------------------------------------------------
             cur.execute("""
-                SELECT username, target_username, content 
-                FROM private_message 
-                WHERE message_id = %s 
-                ORDER BY timestamp ASC
-            """, (chat_room_id,))
+                SELECT t.id as tactic_id, t.name as tactic_name, pm.target_username, pm.content 
+                FROM private_message pm
+                JOIN tactics t ON pm.message_id = t.chat_id
+                WHERE pm.username = %s
+                ORDER BY pm.timestamp ASC
+            """, (username,))
             
-            private_msgs = cur.fetchall()
-            for pm in private_msgs:
-                sender = pm['username'] if isinstance(pm, dict) else pm[0]
-                target = pm['target_username'] if isinstance(pm, dict) else pm[1]
-                content = pm['content'] if isinstance(pm, dict) else pm[2]
+            priv_rows = cur.fetchall()
+            for row in priv_rows:
+                # Tratamento seguro (Dict vs Tupla)
+                tid = str(row['tactic_id'] if isinstance(row, dict) else row[0])
+                tname = row['tactic_name'] if isinstance(row, dict) else row[1]
+                target = row['target_username'] if isinstance(row, dict) else row[2]
+                content = row['content'] if isinstance(row, dict) else row[3]
                 
-                if sender not in chat_map:
-                    chat_map[sender] = {"general": [], "private": []}
+                if tid not in history_map:
+                    history_map[tid] = {
+                        "tactic_name": tname,
+                        "general": [], 
+                        "private": []
+                    }
                 
                 formatted_msg = f"(Para {target}): {content}"
-                chat_map[sender]["private"].append(formatted_msg)
+                history_map[tid]["private"].append(formatted_msg)
 
-        return jsonify(chat_map), 200
+        return jsonify(history_map), 200
 
     except Exception as e:
-        logging.error(f"Erro ao buscar logs de chat da tática {tactic_id}: {str(e)}")
+        logging.error(f"Erro ao buscar histórico de chat do aluno {username}: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
