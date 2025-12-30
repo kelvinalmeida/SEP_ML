@@ -157,3 +157,81 @@ def agent_session_summary(session_id):
     finally:
         if conn:
             conn.close()
+
+
+@agente_control_bp.route('/students/<string:username>/grades_history', methods=['GET'])
+def get_student_grades_history(username):
+    """
+    Retorna o histórico completo de notas de um aluno específico,
+    agrupado por Session ID.
+    
+    URL Exemplo: /students/kelvin123/grades_history
+    """
+    conn = None
+    try:
+        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+        conn = create_connection(db_url)
+        
+        if not conn:
+            return jsonify({"error": "Falha na conexão com o banco"}), 500
+
+        with conn.cursor() as cur:
+            # Estrutura: { "session_id": { "notes": [], "extra_notes": [] } }
+            history_map = {}
+
+            # ---------------------------------------------------------
+            # 1. Buscar Notas de Exercícios (Verified Answers)
+            # ---------------------------------------------------------
+            # Filtramos pelo nome do aluno
+            cur.execute("""
+                SELECT session_id, score 
+                FROM verified_answers 
+                WHERE student_name = %s
+            """, (username,))
+            
+            answers = cur.fetchall()
+            for row in answers:
+                # Tratamento seguro (Dict vs Tupla)
+                sess_id = row['session_id'] if isinstance(row, dict) else row[0]
+                val = row['score'] if isinstance(row, dict) else row[1]
+                
+                # O ID da sessão vira a chave (convertido para string para o JSON)
+                sess_key = str(sess_id)
+                
+                if sess_key not in history_map:
+                    history_map[sess_key] = {"notes": [], "extra_notes": []}
+                
+                history_map[sess_key]["notes"].append(val)
+
+            # ---------------------------------------------------------
+            # 2. Buscar Notas Extras (Extra Notes)
+            # ---------------------------------------------------------
+            # Filtramos pelo nome do aluno
+            cur.execute("""
+                SELECT session_id, extra_notes 
+                FROM extra_notes 
+                WHERE estudante_username = %s
+            """, (username,))
+            
+            extras = cur.fetchall()
+            for row in extras:
+                # Tratamento seguro (Dict vs Tupla)
+                sess_id = row['session_id'] if isinstance(row, dict) else row[0]
+                # Nota: no seu banco a coluna de valor chama-se 'extra_notes' também
+                val = row['extra_notes'] if isinstance(row, dict) else row[1]
+                
+                sess_key = str(sess_id)
+                
+                if sess_key not in history_map:
+                    history_map[sess_key] = {"notes": [], "extra_notes": []}
+                
+                history_map[sess_key]["extra_notes"].append(val)
+
+        return jsonify(history_map), 200
+
+    except Exception as e:
+        logging.error(f"Erro ao buscar histórico do aluno {username}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()

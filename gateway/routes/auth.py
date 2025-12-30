@@ -1,10 +1,19 @@
 from flask import request, redirect, url_for, current_app
 from functools import wraps
 import jwt
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,  # Set minimum log level required (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    format='%(asctime)s [%(levelname)s] %(message)s',  # Log message format
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 def verificar_cookie():
     token = request.cookies.get("access_token")
     current_user = None
+
+    logging.info("Token obtido do cookie: %s", token)
 
     if token:
         try:

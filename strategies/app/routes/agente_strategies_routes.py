@@ -425,3 +425,99 @@ def decide_rules_logic():
     finally:
         if conn:
             conn.close()
+
+
+@agente_strategies_bp.route('/students/<string:username>/chat_history', methods=['GET'])
+def get_student_chat_history(username):
+    """
+    Retorna todo o histórico de chat (Geral e Privado) de um aluno,
+    agrupado pelo ID DA TÁTICA.
+    
+    Estrutura de Retorno:
+    {
+        "tactic_id_1": {
+            "tactic_name": "Debate Sincrono",
+            "general": ["msg1", "msg2"],
+            "private": ["(Para Professor): duvida"]
+        },
+        "tactic_id_5": { ... }
+    }
+    """
+    conn = None
+    try:
+        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
+        conn = create_connection(db_url)
+        
+        if not conn:
+            return jsonify({"error": "Falha na conexão com o banco"}), 500
+
+        with conn.cursor() as cur:
+            # Dicionário principal: Chave será o ID da Tática (String)
+            history_map = {}
+
+            # ---------------------------------------------------------
+            # 1. Buscar Mensagens Gerais (Com JOIN na tabela Tactics)
+            # ---------------------------------------------------------
+            # Precisamos do JOIN para saber qual é o tactic_id associado ao chat (message_id)
+            cur.execute("""
+                SELECT t.id as tactic_id, t.name as tactic_name, gm.content 
+                FROM general_message gm
+                JOIN tactics t ON gm.message_id = t.chat_id
+                WHERE gm.username = %s
+                ORDER BY gm.timestamp ASC
+            """, (username,))
+            
+            gen_rows = cur.fetchall()
+            for row in gen_rows:
+                # Tratamento seguro (Dict vs Tupla)
+                tid = str(row['tactic_id'] if isinstance(row, dict) else row[0])
+                tname = row['tactic_name'] if isinstance(row, dict) else row[1]
+                content = row['content'] if isinstance(row, dict) else row[2]
+                
+                # Inicializa a tática no mapa se não existir
+                if tid not in history_map:
+                    history_map[tid] = {
+                        "tactic_name": tname,
+                        "general": [], 
+                        "private": []
+                    }
+                
+                history_map[tid]["general"].append(content)
+
+            # ---------------------------------------------------------
+            # 2. Buscar Mensagens Privadas (Com JOIN na tabela Tactics)
+            # ---------------------------------------------------------
+            cur.execute("""
+                SELECT t.id as tactic_id, t.name as tactic_name, pm.target_username, pm.content 
+                FROM private_message pm
+                JOIN tactics t ON pm.message_id = t.chat_id
+                WHERE pm.username = %s
+                ORDER BY pm.timestamp ASC
+            """, (username,))
+            
+            priv_rows = cur.fetchall()
+            for row in priv_rows:
+                # Tratamento seguro (Dict vs Tupla)
+                tid = str(row['tactic_id'] if isinstance(row, dict) else row[0])
+                tname = row['tactic_name'] if isinstance(row, dict) else row[1]
+                target = row['target_username'] if isinstance(row, dict) else row[2]
+                content = row['content'] if isinstance(row, dict) else row[3]
+                
+                if tid not in history_map:
+                    history_map[tid] = {
+                        "tactic_name": tname,
+                        "general": [], 
+                        "private": []
+                    }
+                
+                formatted_msg = f"(Para {target}): {content}"
+                history_map[tid]["private"].append(formatted_msg)
+
+        return jsonify(history_map), 200
+
+    except Exception as e:
+        logging.error(f"Erro ao buscar histórico de chat do aluno {username}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
