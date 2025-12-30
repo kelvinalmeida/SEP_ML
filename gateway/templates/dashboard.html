@@ -117,7 +117,7 @@
 
     <!-- Parte de baixo vazia -->
     <main class="flex-fill">
-        {% if current_user %}
+        {% if current_user and current_user.type == 'student'%}
         <div class="container mt-5 mb-5">
             <div class="card shadow">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
@@ -155,7 +155,7 @@
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
         const placeholder = document.getElementById('chat-placeholder');
-        const COOLDOWN_TIME = 60000; // 1 minuto em ms
+        const COOLDOWN_TIME = 120000; // 1 minuto em ms
 
         userInput.addEventListener("keypress", function(event) {
             if (event.key === "Enter") {

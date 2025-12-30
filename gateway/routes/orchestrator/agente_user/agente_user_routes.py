@@ -141,6 +141,8 @@ def ask_tutor(current_user):
         "study_context": study_context
     }
 
+    # return jsonify(final_payload), 200
+
     try:
         logging.info(f"Enviando payload para User Service: {USER_URL}/agent/generate_student_feedback")
         agent_resp = requests.post(
