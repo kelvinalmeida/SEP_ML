@@ -155,6 +155,7 @@
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
         const placeholder = document.getElementById('chat-placeholder');
+        const COOLDOWN_TIME = 60000; // 1 minuto em ms
 
         userInput.addEventListener("keypress", function(event) {
             if (event.key === "Enter") {
@@ -162,8 +163,44 @@
             }
         });
 
-        // Carregar histórico ao iniciar
-        document.addEventListener('DOMContentLoaded', loadChatHistory);
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            loadChatHistory();
+            checkCooldown();
+            setInterval(checkCooldown, 1000); // Verifica a cada segundo
+        });
+
+        function checkCooldown() {
+            const lastMsg = localStorage.getItem('lastMessageTime');
+            if (lastMsg) {
+                const diff = Date.now() - parseInt(lastMsg);
+                if (diff < COOLDOWN_TIME) {
+                    const remaining = Math.ceil((COOLDOWN_TIME - diff) / 1000);
+                    disableChat(true, `Aguarde ${remaining}s`);
+                    return true;
+                }
+            }
+            // Se não estiver enviando (loading), habilita
+            if (sendBtn.innerHTML.includes('spinner')) return true; // Mantém desabilitado se carregando
+
+            disableChat(false);
+            return false;
+        }
+
+        function disableChat(disable, text) {
+            // Só altera se o estado for diferente para evitar flickers ou sobrescrever 'Enviando...'
+            if (disable) {
+                userInput.disabled = true;
+                sendBtn.disabled = true;
+                sendBtn.innerText = text;
+            } else {
+                if (userInput.disabled) userInput.disabled = false;
+                if (sendBtn.disabled) {
+                    sendBtn.disabled = false;
+                    sendBtn.innerText = 'Enviar';
+                }
+            }
+        }
 
         async function loadChatHistory() {
             try {
@@ -191,17 +228,6 @@
                 const response = await fetch('/orchestrator/student/chat_history', { method: 'DELETE' });
                 if (response.ok) {
                     chatBox.innerHTML = '';
-                    // Recria o placeholder
-                    const newPlaceholder = document.createElement('div');
-                    newPlaceholder.id = 'chat-placeholder';
-                    newPlaceholder.className = 'text-center text-muted mt-5';
-                    newPlaceholder.innerHTML = `
-                        <p class="mb-1">👋 Histórico limpo!</p>
-                        <p>Comece uma nova conversa.</p>
-                    `;
-                    chatBox.appendChild(newPlaceholder);
-                    placeholder = newPlaceholder; // Update reference if needed, though placeholder var is const (oops)
-                    // Better just reload or reset visibility logic
                     location.reload();
                 } else {
                     alert("Erro ao limpar chat.");
@@ -213,15 +239,22 @@
         }
 
         async function sendMessage() {
+            // Verifica cooldown antes de tentar enviar
+            if (checkCooldown()) return;
+
             const text = userInput.value.trim();
             if (!text) return;
 
             if(placeholder) placeholder.style.display = 'none';
 
-            // 1. Mensagem do Usuário (Append only, saved by backend)
+            // 1. Mensagem do Usuário
             appendMessage('user', text);
             userInput.value = '';
             setLoading(true);
+
+            // Inicia Cooldown IMEDIATAMENTE após enviar (tentar)
+            localStorage.setItem('lastMessageTime', Date.now());
+            checkCooldown(); // Atualiza UI para desabilitado
 
             const loadingId = appendMessage('system', 'Consultando seus dados e gerando resposta...');
 
@@ -246,7 +279,9 @@
                 appendMessage('error', 'Erro de conexão.');
             } finally {
                 setLoading(false);
-                userInput.focus();
+                // O checkCooldown vai manter desabilitado se ainda estiver no tempo
+                checkCooldown();
+                if (!sendBtn.disabled) userInput.focus();
             }
         }
 
@@ -256,7 +291,7 @@
             if (isLoading) {
                 sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
             } else {
-                sendBtn.innerText = 'Enviar';
+                // O texto será restaurado pelo checkCooldown se disponível
             }
         }
 
