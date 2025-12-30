@@ -513,7 +513,43 @@ def get_student_chat_history(username):
                 formatted_msg = f"(Para {target}): {content}"
                 history_map[tid]["private"].append(formatted_msg)
 
-        return jsonify(history_map), 200
+        # 3. LLM Analysis
+        analysis_text = "Análise indisponível"
+        try:
+            if getattr(Config, 'GROQ_API_KEY', None):
+                client = OpenAI(
+                    api_key=Config.GROQ_API_KEY,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+
+                # Truncate if too long to avoid token limit errors
+                history_str = str(history_map)
+                if len(history_str) > 6000:
+                    history_str = history_str[:6000] + "... (truncated)"
+
+                prompt = f"""
+                Você é um psicopedagogo.
+                Analise as mensagens do aluno no chat. Identifique o nível de engajamento, sentimento (frustração, empolgação) e se ele costuma pedir ajuda ou colaborar.
+
+                Histórico (Tática -> Mensagens):
+                {history_str}
+
+                Responda com um parágrafo conciso.
+                """
+
+                resp = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2
+                )
+                analysis_text = resp.choices[0].message.content
+        except Exception as llm_err:
+            logging.warning(f"LLM Error in chat_history: {llm_err}")
+
+        return jsonify({
+            "student_engagement_analysis": analysis_text,
+            "raw_chat_by_tactic": history_map
+        }), 200
 
     except Exception as e:
         logging.error(f"Erro ao buscar histórico de chat do aluno {username}: {str(e)}")
