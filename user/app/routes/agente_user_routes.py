@@ -6,14 +6,26 @@ from google import genai
 from openai import OpenAI
 from config import Config
 
-# Tentativa de importação relativa ou absoluta do db.py, 
-# seguindo o padrão que você usa no 'control'
 try:
     from db import create_connection
 except ImportError:
     from ...db import create_connection
 
 agente_user_bp = Blueprint('agente_user_bp', __name__)
+
+def ensure_tutor_chat_table(conn):
+    """Garante que a tabela de histórico do tutor existe."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tutor_chat_history (
+                id SERIAL PRIMARY KEY,
+                student_username VARCHAR(100) NOT NULL,
+                sender VARCHAR(20) NOT NULL,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
 
 @agente_user_bp.route('/students/summarize_preferences', methods=['POST'])
 def summarize_preferences():
@@ -28,7 +40,6 @@ def summarize_preferences():
 
     conn = None
     try:
-        # 1. Conexão
         db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
         conn = create_connection(db_url)
         
@@ -38,14 +49,9 @@ def summarize_preferences():
         students_data = []
         
         with conn.cursor() as cur:
-            # 2. Query SQL Atualizada (Incluindo pref_receive_email)
-            # Casting explícito para evitar erro "operator does not exist: integer = text"
-            # O array chega como strings ['1', '2'], mas o banco espera inteiros.
             try:
-                # Tenta converter para inteiros
                 clean_ids = [int(x) for x in student_ids]
             except ValueError:
-                # Se falhar (ex: ids alfanuméricos), mantém como string, mas o erro indicava INT no banco.
                 clean_ids = student_ids
 
             query = """
@@ -59,14 +65,11 @@ def summarize_preferences():
         if not students_data:
             return jsonify({"summary": "Estudantes não encontrados na base de dados."}), 404
 
-        # 3. Formatação do Texto (Tratando o Booleano)
         profiles_text = []
         for s in students_data:
             name = s.get('name', 'Aluno')
             p_type = s.get('pref_content_type') or 'Não informado'
             p_comm = s.get('pref_communication') or 'Não informado'
-            
-            # Lógica para o campo booleano
             recebe_email = s.get('pref_receive_email')
             txt_email = "Aceita receber emails" if recebe_email else "NÃO aceita emails"
             
@@ -74,9 +77,6 @@ def summarize_preferences():
         
         profiles_joined = "\n".join(profiles_text)
 
-        # return jsonify({"profiles": profiles_joined}), 200
-
-        # 1. Prompt Simplificado (Pede apenas texto)
         prompt = f"""
         Atue como um Especialista Pedagógico.
         Analise estas preferências de aprendizado reais:
@@ -91,13 +91,11 @@ def summarize_preferences():
         Apenas o texto corrido, sem formatação JSON, sem markdown e sem títulos.
         """
 
-        # 4. Chamada LLM (Groq)
         client = OpenAI(
             api_key=Config.GROQ_API_KEY,
             base_url="https://api.groq.com/openai/v1"
         )
         
-        # 2. Chamada LLM (Sem response_format JSON)
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
@@ -105,23 +103,19 @@ def summarize_preferences():
                 {"role": "user", "content": prompt}
             ],
             temperature=0.2 
-            # response_format removido para permitir texto livre
         )
 
         content_text = response.choices[0].message.content
         
-        # Faz o parse da string para um dicionário Python antes de enviar
         try:
             summary_dict = json.loads(content_text)
         except json.JSONDecodeError:
-            # Fallback se a IA falhar
             summary_dict = {
                 "resumo": content_text,
                 "perfil_turma": {},
                 "uso_email": "Indeterminado"
             }
 
-        # 4. Retorno (Agora 'summary' será um objeto aninhado, limpo)
         return jsonify({
             "summary": summary_dict,
             "student_count": len(students_data)
@@ -135,45 +129,52 @@ def summarize_preferences():
             conn.close()
 
 
-
 @agente_user_bp.route('/agent/generate_student_feedback', methods=['POST'])
 def generate_student_feedback():
     """
-    Gera um conselho pedagógico personalizado para o aluno.
-    
-    Payload Esperado:
-    {
-        "student_username": "kelvin",
-        "session_id": 1,
-        "domain": {
-            "name": "Introdução a Python",
-            "description": "Conceitos básicos de variáveis e loops"
-        },
-        "performance_data": { "notes": [80], "extra_notes": [1.0] },  <-- Do Control
-        "chat_logs": { "general": ["Dúvida aqui"], "private": [] },   <-- Do Strategies
-        "preferences": {                                              <-- Do User
-            "pref_content_type": "exemplos",
-            "pref_communication": "chat",
-            "pref_receive_email": true
-        }
-    }
+    Gera um feedback ou resposta para o aluno baseada no prompt e contexto agregado.
+    Salva o histórico da conversa.
     """
-    data = request.get_json()
+    data = request.get_json() or {}
     conn = None
 
     try:
-        # 1. Extração de Dados
+        # 1. Extração de Dados do Payload Agregado
         username = data.get('student_username')
-        session_id = data.get('session_id')
-        domain = data.get('domain', {})
-        performance = data.get('performance_data', {})
-        chat = data.get('chat_logs', {})
-        prefs = data.get('preferences', {})
+        user_prompt = data.get('user_prompt')
+        study_context = data.get('study_context', {})
 
         if not username:
             return jsonify({"error": "student_username é obrigatório"}), 400
 
-        # 2. Configuração LLM
+        # 2. Conectar ao Banco
+        db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
+        conn = create_connection(db_url)
+
+        prefs = {}
+        if conn:
+            ensure_tutor_chat_table(conn)
+
+            # Busca perfil
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT pref_content_type, pref_communication, pref_receive_email
+                    FROM student WHERE username = %s
+                """, (username,))
+                row = cur.fetchone()
+                if row:
+                    prefs = dict(row)
+
+            # SALVA MENSAGEM DO USUÁRIO
+            if user_prompt:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO tutor_chat_history (student_username, sender, message)
+                        VALUES (%s, 'user', %s)
+                    """, (username, str(user_prompt)))
+                    conn.commit()
+
+        # 3. Configuração LLM
         if not Config.GROQ_API_KEY:
              return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
 
@@ -182,178 +183,222 @@ def generate_student_feedback():
             base_url="https://api.groq.com/openai/v1"
         )
 
-        # 3. Prompt
-        prompt = f"""
-        Atue como um Mentor Pedagógico Pessoal.
-        Seu objetivo é dar um conselho curto e direto para o aluno melhorar seu desempenho.
+        # 4. Construção do Contexto para o Prompt
+        context_str = "CONTEXTO DE ESTUDO RECENTE:\n"
+        last_session_id = None
+        last_domain_name = None
 
-        CONTEXTO DA AULA:
-        - Tema: {domain.get('name', 'N/A')}
-        - Descrição: {domain.get('description', 'N/A')}
+        if not study_context:
+            context_str += "Nenhum histórico recente encontrado.\n"
+        else:
+            for d_name, d_info in study_context.items():
+                context_str += f"\n=== Domínio: {d_name} ===\n"
+                context_str += f"Descrição: {d_info.get('description', '')}\n"
 
-        PERFIL DO ALUNO ({username}):
-        - Prefere conteúdo do tipo: {prefs.get('pref_content_type', 'Indiferente')}
-        - Prefere comunicação via: {prefs.get('pref_communication', 'Indiferente')}
-        - Aceita dicas por email: {'Sim' if prefs.get('pref_receive_email') else 'Não'}
+                # Materiais (PDF apenas, Videos removidos)
+                mats = d_info.get('material_complementar', {})
+                pdfs = mats.get('pdfs', [])
 
-        DESEMPENHO:
-        - Notas: {performance.get('notes', [])}
-        - Extras: {performance.get('extra_notes', [])}
+                if pdfs:
+                    context_str += "Materiais de Apoio (PDFs):\n"
+                    for p in pdfs:
+                        fname = p.get('filename', 'arquivo.pdf')
+                        preview = p.get('pdf_content', '')
+                        if len(preview) > 200:
+                            preview = preview[:200] + "..."
 
-        CHAT:
-        - Interações Gerais: {len(chat.get('general', []))}
-        - Interações Privadas: {len(chat.get('private', []))}
+                        context_str += f"  - Arquivo: {fname}\n"
+                        if preview:
+                             context_str += f"    Trecho Inicial: {preview}\n"
 
-        TAREFA:
-        Escreva um feedback de 1 parágrafo (em português).
-        1. Elogie pontos fortes.
-        2. Aponte onde melhorar.
-        3. Dê uma dica de estudo baseada na preferência dele.
+                # ANÁLISE DO AGENTE (Substitui histórico detalhado)
+                analysis = d_info.get('session_analysis', {})
+                if analysis:
+                    last_domain_name = d_name
+                    context_str += "ANÁLISE DE DESEMPENHO E ENGAJAMENTO:\n"
+                    context_str += f"  - Performance: {analysis.get('performance', 'N/A')}\n"
+                    context_str += f"  - Engajamento: {analysis.get('engagement', 'N/A')}\n"
+
+        # 5. Prompt Final
+        system_prompt = f"""
+        Você é um Mentor Pedagógico Pessoal e Inteligente.
+        O aluno {username} entrou em contato.
+
+        PERFIL DO ALUNO:
+        - Prefere conteúdo: {prefs.get('pref_content_type', 'Não informado')}
+        - Comunicação: {prefs.get('pref_communication', 'Não informado')}
+        - Email: {'Sim' if prefs.get('pref_receive_email') else 'Não'}
+
+        {context_str}
+
+        SUA TAREFA:
+        Responda ao PROMPT DO USUÁRIO abaixo.
+        1. Se for uma dúvida, responda usando o contexto (especialmente trechos de PDF se houver).
+        2. Se for um pedido de feedback, analise o desempenho nas sessões listadas.
+        3. Adapte a resposta ao perfil do aluno.
+        4. Seja encorajador e direto.
         """
 
-        # 4. Chamada LLM
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "Você é um tutor amigável e motivador."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": str(user_prompt)}
             ],
-            temperature=0.4,
-            max_tokens=300
+            temperature=0.5,
+            max_tokens=600
         )
 
         feedback_text = response.choices[0].message.content
 
-        # 5. Salvar no Banco de Dados (Correção Aqui)
-        db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
-        conn = create_connection(db_url)
-        
+        # 6. Salvar no Banco (Feedback + Mensagem Chat)
         new_id = None
-        if conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO student_feedback 
-                    (student_username, session_id, domain_name, feedback_content)
-                    VALUES (%s, %s, %s, %s)
-                    RETURNING id
-                """, (username, session_id, domain.get('name'), feedback_text))
-                
-                new_row = cur.fetchone()
-                
-                # --- LÓGICA DE EXTRAÇÃO SEGURA ---
-                if new_row:
-                    if isinstance(new_row, dict):
-                        # Se for dicionário (RealDictCursor)
-                        new_id = new_row['id']
-                    else:
-                        # Se for Tupla
-                        new_id = new_row[0]
-                
-                conn.commit()
+        if conn and feedback_text:
+            try:
+                # Salva na tabela chat history
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO tutor_chat_history (student_username, sender, message)
+                        VALUES (%s, 'agent', %s)
+                    """, (username, feedback_text))
+                    conn.commit()
+
+                # Salva na tabela student_feedback (Legacy/Structured) se tiver dados
+                sid_to_save = None
+                if last_session_id:
+                    try:
+                        sid_to_save = int(last_session_id)
+                    except ValueError:
+                        pass
+
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO student_feedback
+                        (student_username, session_id, domain_name, feedback_content)
+                        VALUES (%s, %s, %s, %s)
+                        RETURNING id
+                    """, (username, sid_to_save, last_domain_name, feedback_text))
+
+                    new_row = cur.fetchone()
+                    if new_row:
+                        if isinstance(new_row, dict):
+                            new_id = new_row['id']
+                        else:
+                            new_id = new_row[0]
+                    conn.commit()
+            except Exception as db_err:
+                logging.warning(f"Erro ao salvar no banco: {db_err}")
 
         return jsonify({
             "status": "success",
             "student": username,
-            "feedback": feedback_text,
+            "response": feedback_text,
             "feedback_id": new_id
         }), 200
 
     except Exception as e:
         logging.error(f"Erro ao gerar feedback: {str(e)}")
-        # Dica: Se retornar '0' aqui, é o KeyError capturado
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
             conn.close()
 
+@agente_user_bp.route('/agent/chat_history', methods=['GET'])
+def get_chat_history():
+    """Retorna o histórico de conversas do tutor."""
+    username = request.args.get('username')
+    if not username:
+        return jsonify({"error": "Username required"}), 400
+
+    conn = None
+    try:
+        db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
+        conn = create_connection(db_url)
+        if not conn:
+             return jsonify({"error": "DB Error"}), 500
+
+        ensure_tutor_chat_table(conn)
+
+        history = []
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT sender, message, created_at
+                FROM tutor_chat_history
+                WHERE student_username = %s
+                ORDER BY created_at ASC
+            """, (username,))
+            rows = cur.fetchall()
+            for r in rows:
+                history.append({
+                    "sender": r['sender'],
+                    "message": r['message'],
+                    "timestamp": r['created_at'].isoformat() if r['created_at'] else None
+                })
+
+        return jsonify(history), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn: conn.close()
+
+@agente_user_bp.route('/agent/chat_history', methods=['DELETE'])
+def clear_chat_history():
+    """Limpa o histórico de conversas."""
+    username = request.args.get('username')
+    if not username:
+        return jsonify({"error": "Username required"}), 400
+
+    conn = None
+    try:
+        db_url = getattr(Config, 'SQLALCHEMY_DATABASE_URI', os.getenv('DATABASE_URL'))
+        conn = create_connection(db_url)
+        if not conn:
+             return jsonify({"error": "DB Error"}), 500
+
+        ensure_tutor_chat_table(conn)
+
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM tutor_chat_history WHERE student_username = %s", (username,))
+            conn.commit()
+
+        return jsonify({"status": "cleared"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn: conn.close()
 
 
 @agente_user_bp.route('/agent/help_student', methods=['POST'])
 def help_student_agent():
     """
-    Recebe o contexto consolidado do aluno (perfil, notas, chats, domínios)
-    e usa a LLM para responder à dúvida atual.
+    Rota legada.
     """
     try:
         data = request.get_json()
-        
-        # 1. Extração dos Dados Enviados pelo Orquestrador
         username = data.get('student_username')
         user_prompt = data.get('user_prompt')
-        profile = data.get('student_profile', {})
-        history = data.get('session_history', {}) # Aquele dicionário complexo por sessão
         
-        # 2. Configuração do Cliente LLM (Groq)
         if not Config.GROQ_API_KEY:
-             return jsonify({"error": "GROQ_API_KEY não configurada no User Service"}), 500
+             return jsonify({"error": "GROQ_API_KEY não configurada"}), 500
 
         client = OpenAI(
             api_key=Config.GROQ_API_KEY,
             base_url="https://api.groq.com/openai/v1"
         )
-
-        # 3. Construção do Contexto Histórico para a IA
-        # Vamos transformar o JSON de histórico em um texto legível para a LLM
-        context_text = ""
-        if history:
-            context_text += "HISTÓRICO DE AULAS DO ALUNO:\n"
-            for sess_id, info in history.items():
-                domain = info.get('domain', {})
-                grades = info.get('grades', {})
-                chats = info.get('chats', [])
-                
-                context_text += f"- Sessão {sess_id}: Tópico '{domain.get('title', 'N/A')}'.\n"
-                context_text += f"  Descrição: {domain.get('body', '')}\n"
-                context_text += f"  Desempenho: Notas {grades.get('notes')} | Extras {grades.get('extra_notes')}\n"
-                
-                if chats:
-                    context_text += "  Interações no Chat desta aula:\n"
-                    for chat_block in chats:
-                        msgs = chat_block.get('data', {})
-                        if msgs.get('general'):
-                            context_text += f"    * Geral: {msgs['general']}\n"
-                        if msgs.get('private'):
-                            context_text += f"    * Dúvidas Privadas: {msgs['private']}\n"
-                context_text += "\n"
-        else:
-            context_text = "O aluno ainda não tem histórico de aulas registradas.\n"
-
-        # 4. Construção do Prompt do Sistema
-        system_prompt = f"""
-        Você é um Tutor Inteligente Personalizado. O aluno {username} está pedindo ajuda.
         
-        PERFIL DO ALUNO:
-        - Prefere conteúdo: {profile.get('content_pref')}
-        - Estilo de comunicação: {profile.get('comm_pref')}
-        
-        {context_text}
-        
-        SUA MISSÃO:
-        Responda à dúvida do aluno de forma didática.
-        1. Use o histórico (se relevante) para conectar a dúvida atual com o que ele já estudou ou errou antes.
-        2. Adapte a explicação ao perfil dele (ex: se gosta de 'exemplos', dê código; se 'teoria', explique conceitos).
-        3. Seja encorajador.
-        """
-
-        # 5. Chamada à LLM
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile", # Ou outro modelo disponivel no Groq
+            model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "system", "content": "Tutor Inteligente."},
+                {"role": "user", "content": str(user_prompt)}
             ],
-            temperature=0.5,
-            max_tokens=800
+            temperature=0.5
         )
-
-        ai_message = response.choices[0].message.content
 
         return jsonify({
             "status": "success",
-            "student": username,
-            "response": ai_message
+            "response": response.choices[0].message.content
         }), 200
 
     except Exception as e:
-        logging.error(f"Erro no Agente User (Help Student): {str(e)}")
         return jsonify({"error": str(e)}), 500
