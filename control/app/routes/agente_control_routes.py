@@ -227,7 +227,37 @@ def get_student_grades_history(username):
                 
                 history_map[sess_key]["extra_notes"].append(val)
 
-        return jsonify(history_map), 200
+        # 3. LLM Analysis
+        analysis_text = "Análise indisponível"
+        try:
+            if getattr(Config, 'GROQ_API_KEY', None):
+                client = OpenAI(
+                    api_key=Config.GROQ_API_KEY,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+                prompt = f"""
+                Você é um analista de desempenho escolar.
+                Analise as notas e identifique tendências (melhora, piora, estagnação) e pontos de atenção.
+
+                Dados brutos (Sessão -> Notas):
+                {history_map}
+
+                Responda com um parágrafo conciso.
+                """
+
+                resp = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2
+                )
+                analysis_text = resp.choices[0].message.content
+        except Exception as llm_err:
+            logging.warning(f"LLM Error in grades_history: {llm_err}")
+
+        return jsonify({
+            "student_performance_summary": analysis_text,
+            "raw_history_by_session": history_map
+        }), 200
 
     except Exception as e:
         logging.error(f"Erro ao buscar histórico do aluno {username}: {str(e)}")
