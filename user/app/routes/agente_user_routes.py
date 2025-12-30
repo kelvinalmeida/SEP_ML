@@ -211,24 +211,13 @@ def generate_student_feedback():
                         if preview:
                              context_str += f"    Trecho Inicial: {preview}\n"
 
-                # Sessões
-                for sess in d_info.get('sessions_history', []):
-                    sess_id = sess.get('session_id')
-                    last_session_id = sess_id
+                # ANÁLISE DO AGENTE (Substitui histórico detalhado)
+                analysis = d_info.get('session_analysis', {})
+                if analysis:
                     last_domain_name = d_name
-
-                    perf = sess.get('performance', {})
-                    context_str += f"-- Sessão {sess_id}: Notas {perf.get('notes')} | Extras {perf.get('extra_notes')}\n"
-
-                    interactions = sess.get('interactions', [])
-                    if interactions:
-                        context_str += "   Interações (Chat):\n"
-                        for inter in interactions:
-                            tname = inter.get('tactic_name', 'Tática')
-                            msgs = inter.get('messages', {})
-                            gen_msgs = msgs.get('general', [])
-                            if gen_msgs:
-                                context_str += f"     [{tname}] Geral: {gen_msgs}\n"
+                    context_str += "ANÁLISE DE DESEMPENHO E ENGAJAMENTO:\n"
+                    context_str += f"  - Performance: {analysis.get('performance', 'N/A')}\n"
+                    context_str += f"  - Engajamento: {analysis.get('engagement', 'N/A')}\n"
 
         # 5. Prompt Final
         system_prompt = f"""
