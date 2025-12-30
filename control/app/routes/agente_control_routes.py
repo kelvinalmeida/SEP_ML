@@ -159,13 +159,11 @@ def agent_session_summary(session_id):
             conn.close()
 
 
-@agente_control_bp.route('/students/<string:username>/grades_history', methods=['GET'])
-def get_student_grades_history(username):
+@agente_control_bp.route('/students/<string:student_id>/grades_history', methods=['GET'])
+def get_student_grades_history(student_id):
     """
-    Retorna o histórico completo de notas de um aluno específico,
+    Retorna o histórico completo de notas de um aluno específico (pelo ID),
     agrupado por Session ID.
-    
-    URL Exemplo: /students/kelvin123/grades_history
     """
     conn = None
     try:
@@ -182,12 +180,12 @@ def get_student_grades_history(username):
             # ---------------------------------------------------------
             # 1. Buscar Notas de Exercícios (Verified Answers)
             # ---------------------------------------------------------
-            # Filtramos pelo nome do aluno
+            # Filtramos pelo student_id (muito mais seguro que nome)
             cur.execute("""
                 SELECT session_id, score 
                 FROM verified_answers 
-                WHERE student_name = %s
-            """, (username,))
+                WHERE student_id = %s
+            """, (student_id,))
             
             answers = cur.fetchall()
             for row in answers:
@@ -206,12 +204,12 @@ def get_student_grades_history(username):
             # ---------------------------------------------------------
             # 2. Buscar Notas Extras (Extra Notes)
             # ---------------------------------------------------------
-            # Filtramos pelo nome do aluno
+            # Filtramos pelo ID (ajustando a query para student_id)
             cur.execute("""
                 SELECT session_id, extra_notes 
                 FROM extra_notes 
-                WHERE estudante_username = %s
-            """, (username,))
+                WHERE student_id = %s
+            """, (int(student_id) if student_id.isdigit() else 0,))
             
             extras = cur.fetchall()
             for row in extras:

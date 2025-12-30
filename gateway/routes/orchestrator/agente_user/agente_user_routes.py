@@ -31,10 +31,13 @@ def ask_tutor(current_user):
         return jsonify({"error": "O campo 'prompt' é obrigatório."}), 400
 
     username = current_user.get('username') if isinstance(current_user, dict) else current_user
+    student_id = current_user.get('id') if isinstance(current_user, dict) else None
 
     def fetch_grades():
         try:
-            resp = requests.get(f"{CONTROL_URL}/students/{username}/grades_history")
+            # Control service now expects student_id for better accuracy
+            target_id = str(student_id) if student_id else '0'
+            resp = requests.get(f"{CONTROL_URL}/students/{target_id}/grades_history")
             return resp.json() if resp.status_code == 200 else {}
         except Exception as e:
             logging.error(f"Erro ao buscar grades: {e}")
@@ -51,14 +54,29 @@ def ask_tutor(current_user):
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_grades = executor.submit(fetch_grades)
         future_chats = executor.submit(fetch_chats)
-        grades_history = future_grades.result()
-        chat_history = future_chats.result()
+        grades_resp = future_grades.result()
+        chat_resp = future_chats.result()
+
+    # Extract Data from Smart Responses
+    if 'raw_history_by_session' in grades_resp:
+        raw_grades = grades_resp['raw_history_by_session']
+        perf_summary = grades_resp.get('student_performance_summary', 'Sem resumo.')
+    else:
+        raw_grades = grades_resp
+        perf_summary = "Resumo indisponível (Dados antigos ou erro)."
+
+    if 'raw_chat_by_tactic' in chat_resp:
+        # raw_chats = chat_resp['raw_chat_by_tactic'] # Unused in simplified view
+        eng_summary = chat_resp.get('student_engagement_analysis', 'Sem resumo.')
+    else:
+        # raw_chats = chat_resp
+        eng_summary = "Resumo indisponível (Dados antigos ou erro)."
 
     study_context = {}
     domain_cache = {}
-    strategy_cache = {}
 
-    for session_id, performance_data in grades_history.items():
+    # Iterate raw grades to find relevant domains
+    for session_id, performance_data in raw_grades.items():
         try:
             sess_resp = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
             if sess_resp.status_code != 200: continue
@@ -107,46 +125,11 @@ def ask_tutor(current_user):
                 study_context[domain_name] = {
                     "description": domain_info.get('description', ''),
                     "material_complementar": {"pdfs": processed_pdfs},
-                    "sessions_history": []
+                    "session_analysis": {
+                        "performance": perf_summary,
+                        "engagement": eng_summary
+                    }
                 }
-
-            strategy_id = session_meta.get('original_strategy_id')
-            if not strategy_id and session_meta.get('strategies'):
-                strategy_id = session_meta['strategies'][0]
-            strategy_id = str(strategy_id) if strategy_id else None
-
-            session_interactions = []
-            if strategy_id:
-                if strategy_id in strategy_cache:
-                    tactics = strategy_cache[strategy_id]
-                else:
-                    strat_resp = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
-                    if strat_resp.status_code == 200:
-                        strat_data = strat_resp.json()
-                        # 'tatics' is a known typo in the strategies service response
-                        tactics = strat_data.get('tatics', [])
-                        strategy_cache[strategy_id] = tactics
-                    else:
-                        tactics = []
-
-                tactic_map = {str(t['id']): t['name'] for t in tactics}
-                for chat_tactic_id, chat_msgs in chat_history.items():
-                    if str(chat_tactic_id) in tactic_map:
-                        session_interactions.append({
-                            "tactic_id": str(chat_tactic_id),
-                            "tactic_name": tactic_map[str(chat_tactic_id)],
-                            "messages": chat_msgs
-                        })
-
-            session_obj = {
-                "session_id": str(session_id),
-                "performance": {
-                    "notes": performance_data.get('notes', []),
-                    "extra_notes": performance_data.get('extra_notes', [])
-                },
-                "interactions": session_interactions
-            }
-            study_context[domain_name]["sessions_history"].append(session_obj)
 
         except Exception as e:
             logging.error(f"Erro ao processar sessão {session_id}: {e}")
