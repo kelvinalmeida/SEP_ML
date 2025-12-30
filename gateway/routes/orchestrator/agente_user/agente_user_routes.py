@@ -51,29 +51,14 @@ def ask_tutor(current_user):
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_grades = executor.submit(fetch_grades)
         future_chats = executor.submit(fetch_chats)
-        grades_resp = future_grades.result()
-        chat_resp = future_chats.result()
-
-    # Extract Data from Smart Responses
-    if 'raw_history_by_session' in grades_resp:
-        raw_grades = grades_resp['raw_history_by_session']
-        perf_summary = grades_resp.get('student_performance_summary', 'Sem resumo.')
-    else:
-        raw_grades = grades_resp
-        perf_summary = "Resumo indisponível (Dados antigos ou erro)."
-
-    if 'raw_chat_by_tactic' in chat_resp:
-        # raw_chats = chat_resp['raw_chat_by_tactic'] # Unused in simplified view
-        eng_summary = chat_resp.get('student_engagement_analysis', 'Sem resumo.')
-    else:
-        # raw_chats = chat_resp
-        eng_summary = "Resumo indisponível (Dados antigos ou erro)."
+        grades_history = future_grades.result()
+        chat_history = future_chats.result()
 
     study_context = {}
     domain_cache = {}
+    strategy_cache = {}
 
-    # Iterate raw grades to find relevant domains
-    for session_id, performance_data in raw_grades.items():
+    for session_id, performance_data in grades_history.items():
         try:
             sess_resp = requests.get(f"{CONTROL_URL}/sessions/{session_id}")
             if sess_resp.status_code != 200: continue
@@ -91,7 +76,7 @@ def ask_tutor(current_user):
                     domain_cache[domain_id] = domain_info
                 else:
                     domain_info = {"name": "Domínio Desconhecido", "description": "", "pdfs": []}
-            
+
             domain_name = domain_info.get('name', 'Domínio Sem Nome')
 
             if domain_name not in study_context:
@@ -122,11 +107,46 @@ def ask_tutor(current_user):
                 study_context[domain_name] = {
                     "description": domain_info.get('description', ''),
                     "material_complementar": {"pdfs": processed_pdfs},
-                    "session_analysis": {
-                        "performance": perf_summary,
-                        "engagement": eng_summary
-                    }
+                    "sessions_history": []
                 }
+
+            strategy_id = session_meta.get('original_strategy_id')
+            if not strategy_id and session_meta.get('strategies'):
+                strategy_id = session_meta['strategies'][0]
+            strategy_id = str(strategy_id) if strategy_id else None
+
+            session_interactions = []
+            if strategy_id:
+                if strategy_id in strategy_cache:
+                    tactics = strategy_cache[strategy_id]
+                else:
+                    strat_resp = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
+                    if strat_resp.status_code == 200:
+                        strat_data = strat_resp.json()
+                        # 'tatics' is a known typo in the strategies service response
+                        tactics = strat_data.get('tatics', [])
+                        strategy_cache[strategy_id] = tactics
+                    else:
+                        tactics = []
+
+                tactic_map = {str(t['id']): t['name'] for t in tactics}
+                for chat_tactic_id, chat_msgs in chat_history.items():
+                    if str(chat_tactic_id) in tactic_map:
+                        session_interactions.append({
+                            "tactic_id": str(chat_tactic_id),
+                            "tactic_name": tactic_map[str(chat_tactic_id)],
+                            "messages": chat_msgs
+                        })
+
+            session_obj = {
+                "session_id": str(session_id),
+                "performance": {
+                    "notes": performance_data.get('notes', []),
+                    "extra_notes": performance_data.get('extra_notes', [])
+                },
+                "interactions": session_interactions
+            }
+            study_context[domain_name]["sessions_history"].append(session_obj)
 
         except Exception as e:
             logging.error(f"Erro ao processar sessão {session_id}: {e}")
