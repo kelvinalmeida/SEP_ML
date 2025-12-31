@@ -8,14 +8,9 @@ from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 from contextlib import contextmanager
 
-# Assuming db.py is available in the python path (root of the service)
 try:
     from db import create_connection
 except ImportError:
-    # If running from a different context where db is not top-level
-    # This might need adjustment based on how the app is launched.
-    # But based on user request "use db.py in control folder", and domain example.
-    # We will try a relative import if this fails or assume it works.
     from ...db import create_connection
 
 session_bp = Blueprint('session_bp', __name__)
@@ -23,10 +18,8 @@ session_bp = Blueprint('session_bp', __name__)
 def generate_unique_code(length=8):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
-# Wrapper to use create_connection in a context manager style or just helper
 @contextmanager
 def get_db_connection():
-    # create_connection takes db_url
     db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI") or os.getenv("DATABASE_URL")
     conn = create_connection(db_url)
     if conn is None:
@@ -36,16 +29,34 @@ def get_db_connection():
     finally:
         conn.close()
 
+def ensure_rating_tables(conn):
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS session_ratings (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL,
+                student_id VARCHAR(50) NOT NULL,
+                rating INTEGER NOT NULL,
+                CONSTRAINT fk_rating_session FOREIGN KEY (session_id) REFERENCES session(id) ON DELETE CASCADE,
+                UNIQUE(session_id, student_id)
+            );
+        """)
+        try:
+            cur.execute("ALTER TABLE session ADD COLUMN IF NOT EXISTS rating_average FLOAT DEFAULT 0.0")
+            cur.execute("ALTER TABLE session ADD COLUMN IF NOT EXISTS rating_count INTEGER DEFAULT 0")
+        except Exception as e:
+            conn.rollback()
+            logging.warning(f"Columns ensure error (ignored): {e}")
+        conn.commit()
+
 def get_session_details(conn, session_id):
     with conn.cursor() as cur:
-        # Get Session
         cur.execute("SELECT * FROM session WHERE id = %s", (session_id,))
         session = cur.fetchone()
 
         if not session:
             return None
 
-        # Get Related Lists
         cur.execute("SELECT strategy_id FROM session_strategies WHERE session_id = %s", (session_id,))
         strategies = [row['strategy_id'] for row in cur.fetchall()]
 
@@ -58,21 +69,22 @@ def get_session_details(conn, session_id):
         cur.execute("SELECT domain_id FROM session_domains WHERE session_id = %s", (session_id,))
         domains = [row['domain_id'] for row in cur.fetchall()]
 
-        # Get VerifiedAnswers
         cur.execute("SELECT * FROM verified_answers WHERE session_id = %s", (session_id,))
         verified_answers = cur.fetchall()
 
-        # Get ExtraNotes
         cur.execute("SELECT * FROM extra_notes WHERE session_id = %s", (session_id,))
         extra_notes = cur.fetchall()
 
-        # Format the session dict to match the previous model.to_dict()
         session_dict = dict(session)
-        # Ensure use_agent is present in the dict, defaulting to False if not in DB row (handled by SQL default)
         session_dict['use_agent'] = session.get('use_agent', False)
         session_dict['end_on_next_completion'] = session.get('end_on_next_completion', False)
 
-        # Parse executed_indices safely
+        # Rating fields might not be in dict if row factory doesn't include them yet (lazy migration)
+        # But 'dict(session)' from RealDictCursor should include them if columns exist.
+        # We handle defaults just in case
+        session_dict['rating_average'] = session.get('rating_average', 0.0)
+        session_dict['rating_count'] = session.get('rating_count', 0)
+
         try:
             session_dict['executed_indices'] = json.loads(session.get('executed_indices', '[]'))
         except:
@@ -106,12 +118,7 @@ def ensure_executed_indices_column(conn):
             logging.warning(f"Note on ensure_executed_indices_column: {e}")
 
 def update_executed_indices(conn, session_id):
-    """
-    Appends the current_tactic_index to the executed_indices list in DB.
-    Should be called BEFORE updating the index to a new value.
-    """
     with conn.cursor() as cur:
-        # Get current index and history
         cur.execute("SELECT current_tactic_index, executed_indices FROM session WHERE id = %s", (session_id,))
         row = cur.fetchone()
 
@@ -122,7 +129,6 @@ def update_executed_indices(conn, session_id):
             except:
                 history = []
 
-            # Avoid duplicates if it's already the last one (optional, but good for idempotency)
             if not history or history[-1] != current_idx:
                 history.append(current_idx)
 
@@ -130,24 +136,18 @@ def update_executed_indices(conn, session_id):
             conn.commit()
 
 def _end_session(conn, session_id):
-    """
-    Helper to end the session logic, allowing reuse.
-    """
     with conn.cursor() as cur:
         cur.execute("SELECT id, original_strategy_id FROM session WHERE id = %s", (session_id,))
         session = cur.fetchone()
         if not session:
             return False
 
-        # Revert to original strategy if it was changed
         if session.get('original_strategy_id'):
             original_strategy_id = session['original_strategy_id']
-            # Revert session_strategies
             cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
             cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
                        (session_id, str(original_strategy_id)))
 
-            # Clear the original_strategy_id column
             cur.execute("UPDATE session SET status = 'finished', original_strategy_id = NULL WHERE id = %s", (session_id,))
         else:
             cur.execute("UPDATE session SET status = 'finished' WHERE id = %s", (session_id,))
@@ -177,7 +177,6 @@ def create_session():
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Generate unique code
             while True:
                 code = generate_unique_code()
                 cur.execute("SELECT 1 FROM session WHERE code = %s", (code,))
@@ -188,14 +187,9 @@ def create_session():
                 INSERT INTO session (status, code, current_tactic_index)
                 VALUES (%s, %s, %s)
                 RETURNING id
-            """, (
-                'aguardando',
-                code,
-                0
-            ))
+            """, ('aguardando', code, 0))
             session_id = cur.fetchone()['id']
 
-            # Insert relations
             if strategies:
                 cur.executemany("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)",
                                 [(session_id, str(s)) for s in strategies])
@@ -216,6 +210,7 @@ def create_session():
 @session_bp.route('/sessions', methods=['GET'])
 def list_sessions():
     with get_db_connection() as conn:
+        ensure_rating_tables(conn) # Ensure tables exist when listing (lazy init)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM session")
             rows = cur.fetchall()
@@ -231,6 +226,7 @@ def list_sessions():
 @session_bp.route('/sessions/<int:session_id>', methods=['GET'])
 def get_session_by_id(session_id):
     with get_db_connection() as conn:
+        ensure_rating_tables(conn)
         session_dict = get_session_details(conn, session_id)
 
     if session_dict:
@@ -247,7 +243,6 @@ def delete_session(session_id):
             if not cur.fetchone():
                 return jsonify({"error": "Session not found"}), 404
 
-            # Cascading delete will handle related tables
             cur.execute("DELETE FROM session WHERE id = %s", (session_id,))
             conn.commit()
 
@@ -323,21 +318,16 @@ def temp_switch_strategy(session_id):
             if not session:
                 return jsonify({"error": "Session not found"}), 404
 
-            # If original_strategy_id is not set, it means we are on the original strategy.
-            # We should save the current strategy before switching.
             if not session['original_strategy_id']:
                 cur.execute("SELECT strategy_id FROM session_strategies WHERE session_id = %s", (session_id,))
                 rows = cur.fetchall()
-                # Assuming single strategy for now as per "change strategy" flow
                 if rows:
                     current_strategy_id = rows[0]['strategy_id']
                     cur.execute("UPDATE session SET original_strategy_id = %s WHERE id = %s", (current_strategy_id, session_id))
 
-            # Update to new strategy
             cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
             cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)", (session_id, str(new_strategy_id)))
 
-            # Reset tactic index for the new strategy
             start_time = datetime.utcnow()
             cur.execute("""
                 UPDATE session
@@ -358,7 +348,6 @@ def next_tactic(session_id):
     with get_db_connection() as conn:
         ensure_executed_indices_column(conn)
 
-        # Check for end_on_next_completion flag
         end_flag = False
         with conn.cursor() as cur:
             try:
@@ -373,7 +362,6 @@ def next_tactic(session_id):
             _end_session(conn, session_id)
             return jsonify({"success": True, "session_status": "finished", "message": "Session ended by rule."})
 
-        # Update History BEFORE changing index
         update_executed_indices(conn, session_id)
 
         with conn.cursor() as cur:
@@ -405,8 +393,6 @@ def set_tactic_index(session_id):
 
     with get_db_connection() as conn:
         ensure_executed_indices_column(conn)
-
-        # Update History BEFORE changing index
         update_executed_indices(conn, session_id)
 
         with conn.cursor() as cur:
@@ -574,17 +560,11 @@ def change_session_strategy(session_id):
             if not cur.fetchone():
                 return jsonify({"error": "Session not found"}), 404
 
-            # Update strategy
-            # First remove existing strategies (assuming single strategy replacement based on request description)
-            # The schema allows multiple strategies (session_strategies table), but the prompt implies replacing "the" strategy.
-            # I will clear all existing strategies for this session and add the new one.
             cur.execute("DELETE FROM session_strategies WHERE session_id = %s", (session_id,))
             cur.execute("INSERT INTO session_strategies (session_id, strategy_id) VALUES (%s, %s)", (session_id, str(new_strategy_id)))
 
-            # Clear verified answers (full reset)
             cur.execute("DELETE FROM verified_answers WHERE session_id = %s", (session_id,))
 
-            # Reset session state
             start_time = datetime.utcnow()
             cur.execute("""
                 UPDATE session
@@ -618,15 +598,11 @@ def change_session_domain(session_id):
             if not cur.fetchone():
                 return jsonify({"error": "Session not found"}), 404
 
-            # Update domain
-            # Clear existing domains and add the new one
             cur.execute("DELETE FROM session_domains WHERE session_id = %s", (session_id,))
             cur.execute("INSERT INTO session_domains (session_id, domain_id) VALUES (%s, %s)", (session_id, str(new_domain_id)))
 
-            # Clear verified answers (full reset)
             cur.execute("DELETE FROM verified_answers WHERE session_id = %s", (session_id,))
 
-            # Reset session state
             start_time = datetime.utcnow()
             cur.execute("""
                 UPDATE session
@@ -642,3 +618,78 @@ def change_session_domain(session_id):
             conn.commit()
 
     return jsonify({"success": "Domain changed and session restarted!"}), 200
+
+# ============================
+# RATING ROUTES
+# ============================
+
+@session_bp.route('/sessions/<int:session_id>/rate', methods=['POST'])
+def rate_session(session_id):
+    data = request.get_json()
+    student_id = str(data.get('student_id'))
+    rating = int(data.get('rating'))
+
+    if not (1 <= rating <= 5):
+        return jsonify({"error": "Rating must be between 1 and 5"}), 400
+
+    with get_db_connection() as conn:
+        ensure_rating_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM session WHERE id = %s", (session_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Session not found"}), 404
+
+            # Upsert Rating
+            cur.execute("""
+                INSERT INTO session_ratings (session_id, student_id, rating)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (session_id, student_id)
+                DO UPDATE SET rating = EXCLUDED.rating
+            """, (session_id, student_id, rating))
+
+            # Recalculate Average
+            cur.execute("""
+                SELECT AVG(rating) as avg, COUNT(*) as cnt
+                FROM session_ratings
+                WHERE session_id = %s
+            """, (session_id,))
+            row = cur.fetchone()
+            new_avg = row['avg'] or 0.0
+            new_count = row['cnt'] or 0
+
+            # Update Session Table
+            cur.execute("""
+                UPDATE session
+                SET rating_average = %s, rating_count = %s
+                WHERE id = %s
+            """, (new_avg, new_count, session_id))
+
+            conn.commit()
+
+    return jsonify({"success": True, "average": new_avg, "count": new_count}), 200
+
+@session_bp.route('/sessions/<int:session_id>/rating', methods=['GET'])
+def get_session_rating(session_id):
+    student_id = request.args.get('student_id')
+
+    with get_db_connection() as conn:
+        ensure_rating_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT rating_average, rating_count FROM session WHERE id = %s", (session_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Session not found"}), 404
+
+            result = {
+                "average": row['rating_average'] if row['rating_average'] is not None else 0.0,
+                "count": row['rating_count'] if row['rating_count'] is not None else 0,
+                "user_rating": None
+            }
+
+            if student_id:
+                cur.execute("SELECT rating FROM session_ratings WHERE session_id = %s AND student_id = %s", (session_id, str(student_id)))
+                user_row = cur.fetchone()
+                if user_row:
+                    result['user_rating'] = user_row['rating']
+
+    return jsonify(result), 200

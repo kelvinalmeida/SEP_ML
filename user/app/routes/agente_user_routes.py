@@ -264,12 +264,8 @@ def generate_student_feedback():
                     conn.commit()
 
                 # Salva na tabela student_feedback (Legacy/Structured) se tiver dados
+                # Nota: session_id não está mais disponível no payload simplificado
                 sid_to_save = None
-                if last_session_id:
-                    try:
-                        sid_to_save = int(last_session_id)
-                    except ValueError:
-                        pass
 
                 with conn.cursor() as cur:
                     cur.execute("""
