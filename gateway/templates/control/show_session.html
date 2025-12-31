@@ -269,6 +269,35 @@
 
                 <hr>
 
+                <!-- Avaliação da Sessão -->
+                <div class="card mb-4 shadow-sm border-warning">
+                    <div class="card-body text-center">
+                        <h5 class="card-title text-warning">Avaliação da Aula</h5>
+
+                        <div id="rating-container">
+                            <!-- Stars for Student -->
+                            {% if current_user.type == 'student' %}
+                            <div class="fs-2 text-warning mb-2" id="star-rating" style="cursor: pointer;">
+                                <i class="bi bi-star" data-value="1" onclick="submitRating(1)"></i>
+                                <i class="bi bi-star" data-value="2" onclick="submitRating(2)"></i>
+                                <i class="bi bi-star" data-value="3" onclick="submitRating(3)"></i>
+                                <i class="bi bi-star" data-value="4" onclick="submitRating(4)"></i>
+                                <i class="bi bi-star" data-value="5" onclick="submitRating(5)"></i>
+                            </div>
+                            <small class="text-muted" id="user-rating-msg">Toque para avaliar</small>
+                            {% endif %}
+
+                            <!-- Stats for Everyone -->
+                            <div class="mt-2">
+                                <span class="badge bg-warning text-dark fs-6">
+                                    <i class="bi bi-star-fill"></i> <span id="avg-rating">--</span>
+                                </span>
+                                <span class="text-muted ms-2">(<span id="rating-count">0</span> votos)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Estratégias -->
                 <div class="mb-4">
                     <h5 class="text-decoration-underline">Strategies & Tactics</h5>
@@ -512,6 +541,62 @@
                     }, 2000);
                 });
         }
+
+        async function loadRating() {
+            try {
+                const res = await fetch(`/sessions/${window.session_id}/rating`);
+                const data = await res.json();
+
+                const avgEl = document.getElementById('avg-rating');
+                const countEl = document.getElementById('rating-count');
+
+                if(avgEl) avgEl.innerText = data.average ? parseFloat(data.average).toFixed(1) : '0.0';
+                if(countEl) countEl.innerText = data.count || 0;
+
+                if (window.current_user_json.type === 'student' && data.user_rating) {
+                    updateStars(data.user_rating);
+                    const msgEl = document.getElementById('user-rating-msg');
+                    if(msgEl) msgEl.innerText = "Sua avaliação: " + data.user_rating;
+                }
+            } catch (e) {
+                console.error("Error loading rating", e);
+            }
+        }
+
+        async function submitRating(value) {
+            try {
+                const res = await fetch(`/sessions/${window.session_id}/rate`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({rating: value})
+                });
+                if (res.ok) {
+                    updateStars(value);
+                    const msgEl = document.getElementById('user-rating-msg');
+                    if(msgEl) msgEl.innerText = "Sua avaliação: " + value;
+                    loadRating(); // Refresh stats
+                }
+            } catch (e) {
+                console.error("Error submitting rating", e);
+            }
+        }
+
+        function updateStars(value) {
+            const stars = document.querySelectorAll('#star-rating i');
+            stars.forEach(s => {
+                const v = parseInt(s.getAttribute('data-value'));
+                if (v <= value) {
+                    s.classList.remove('bi-star');
+                    s.classList.add('bi-star-fill');
+                } else {
+                    s.classList.remove('bi-star-fill');
+                    s.classList.add('bi-star');
+                }
+            });
+        }
+
+        // Call on load
+        document.addEventListener('DOMContentLoaded', loadRating);
     </script>
 
     <!-- Bootstrap Bundle (inclui Popper) -->
