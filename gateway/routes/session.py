@@ -553,3 +553,44 @@ def change_domain(session_id, current_user=None):
 
     except RequestException as e:
         return jsonify({"error": "Control service unavailable", "details": str(e)}), 503
+
+@session_bp.route('/sessions/<int:session_id>/rate', methods=['POST'])
+@token_required
+def rate_session(session_id, current_user=None):
+    if not current_user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if current_user.get('type') != 'student':
+        return jsonify({"error": "Only students can vote"}), 403
+
+    try:
+        data = request.get_json()
+        payload = {
+            'student_id': current_user.get('id'),
+            'rating': data.get('rating')
+        }
+
+        response = requests.post(f"{CONTROL_URL}/sessions/{session_id}/rate", json=payload)
+        # Tenta retornar JSON se possível
+        try:
+            return jsonify(response.json()), response.status_code
+        except:
+            return (response.text, response.status_code, response.headers.items())
+    except RequestException as e:
+        return jsonify({"error": "Service unavailable", "details": str(e)}), 503
+
+@session_bp.route('/sessions/<int:session_id>/rating', methods=['GET'])
+@token_required
+def get_session_rating(session_id, current_user=None):
+    try:
+        params = {}
+        if current_user and current_user.get('type') == 'student':
+            params['student_id'] = current_user.get('id')
+
+        response = requests.get(f"{CONTROL_URL}/sessions/{session_id}/rating", params=params)
+        try:
+            return jsonify(response.json()), response.status_code
+        except:
+            return (response.text, response.status_code, response.headers.items())
+    except RequestException as e:
+        return jsonify({"error": "Service unavailable", "details": str(e)}), 503
