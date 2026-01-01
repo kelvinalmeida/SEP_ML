@@ -213,6 +213,10 @@ function initializeChatComponent() {
         const sender_username = message.username;
         const target_username = message.target_username;
 
+        if (myUsername !== sender_username && myUsername !== target_username) {
+            return;
+        }
+
         const isSender = myUsername === sender_username;
         const otherUsername = isSender ? target_username : sender_username;
         const paneId = `tab-pane-${otherUsername}`;
