@@ -37,13 +37,23 @@ def execute_agent_logic(session_id, session_json):
                         executed_ids.append(tactics[idx]['id'])
 
                 # Adiciona a atual também, pois ela acabou de ser "feita" no momento da decisão
-                # Evita duplicidade se já estiver no histórico (embora Control adicione no next, aqui estamos decidindo O PRÓXIMO)
-                # Na verdade, a atual AINDA NÃO FOI adicionada no histórico do DB (só no next_tactic).
-                # Então precisamos adicionar manualmente aqui para o agente saber que "já fez".
                 if 0 <= current_idx < len(tactics):
                     current_id = tactics[current_idx]['id']
                     if current_id not in executed_ids:
                         executed_ids.append(current_id)
+
+                # --- Verificação de Segurança (Fim da Sessão) ---
+                # Se estamos na última tática (índice) E todas as táticas da estratégia já foram executadas
+                # O Agente não deve forçar uma decisão, permitindo que o fluxo padrão encerre a sessão.
+                unique_executed = set(executed_ids)
+                all_tactic_ids = set(t['id'] for t in tactics)
+
+                is_last_tactic_index = (current_idx >= len(tactics) - 1)
+                all_tactics_done = unique_executed.issuperset(all_tactic_ids)
+
+                if is_last_tactic_index and all_tactics_done:
+                    logging.info("🏁 Todas as táticas executadas e estamos no final. Encerrando intervenção do Agente.")
+                    return None
 
         performance_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}/agent_summary")
         performance_summary = performance_res.json().get('summary', 'Sem dados de performance.') if performance_res.status_code == 200 else 'Erro ao buscar performance.'

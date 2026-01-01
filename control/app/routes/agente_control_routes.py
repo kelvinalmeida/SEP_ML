@@ -279,7 +279,7 @@ def get_student_grades_history(student_id):
         }), 200
 
     except Exception as e:
-        logging.error(f"Erro ao buscar histórico do aluno {username}: {str(e)}")
+        logging.error(f"Erro ao buscar histórico do aluno {student_id}: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
