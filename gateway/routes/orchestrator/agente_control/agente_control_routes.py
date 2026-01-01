@@ -21,6 +21,7 @@ def execute_agent_logic(session_id, session_json):
 
         # Inferir táticas executadas (usando histórico real do Control)
         executed_ids = []
+        tactics = []
         if strategy_id:
             strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
             if strat_res.status_code == 200:
@@ -38,12 +39,32 @@ def execute_agent_logic(session_id, session_json):
 
                 # Adiciona a atual também, pois ela acabou de ser "feita" no momento da decisão
                 # Evita duplicidade se já estiver no histórico (embora Control adicione no next, aqui estamos decidindo O PRÓXIMO)
-                # Na verdade, a atual AINDA NÃO FOI adicionada no histórico do DB (só no next_tactic).
-                # Então precisamos adicionar manualmente aqui para o agente saber que "já fez".
                 if 0 <= current_idx < len(tactics):
                     current_id = tactics[current_idx]['id']
                     if current_id not in executed_ids:
                         executed_ids.append(current_id)
+
+                # --- NEW CHECK: Se todas as táticas foram executadas, encerra a sessão ---
+                # Apenas se a estratégia atual NÃO for vazia
+                if tactics:
+                    all_tactic_ids = {t['id'] for t in tactics}
+                    executed_ids_set = set(executed_ids)
+
+                    # Se já cobrimos todas as táticas da estratégia atual
+                    if all_tactic_ids.issubset(executed_ids_set):
+                        logging.info("🏁 Todas as táticas da estratégia atual foram executadas. Encerrando sessão.")
+
+                        # Chama endpoint de fim de sessão no Control
+                        end_res = requests.post(f"{CONTROL_URL}/sessions/end/{session_id}")
+
+                        if end_res.status_code == 200:
+                            return jsonify({
+                                "success": True,
+                                "session_status": "finished",
+                                "message": "All tactics executed."
+                            }), 200
+                        else:
+                            logging.error(f"Erro ao encerrar sessão: {end_res.text}")
 
         performance_res = requests.get(f"{CONTROL_URL}/sessions/{session_id}/agent_summary")
         performance_summary = performance_res.json().get('summary', 'Sem dados de performance.') if performance_res.status_code == 200 else 'Erro ao buscar performance.'
@@ -93,49 +114,47 @@ def execute_agent_logic(session_id, session_json):
 
             # 5. Aplicar Decisão (Encontrar índice e setar)
             if chosen_tactic_id and strategy_id:
-                 strat_res = requests.get(f"{STRATEGIES_URL}/strategies/{strategy_id}")
-                 if strat_res.status_code == 200:
-                     tactics = strat_res.json().get('tatics', [])
-                     target_index = -1
-                     for idx, t in enumerate(tactics):
-                         if t['id'] == chosen_tactic_id:
-                             target_index = idx
-                             break
+                 # Reusar tactics já buscadas acima
+                 target_index = -1
+                 for idx, t in enumerate(tactics):
+                     if t['id'] == chosen_tactic_id:
+                         target_index = idx
+                         break
 
-                     if target_index != -1:
-                         # Seta o índice no Control
-                         requests.post(f"{CONTROL_URL}/sessions/tactic/set/{session_id}", json={'tactic_index': target_index})
-                         logging.info(f"✅ Índice da tática atualizado para {target_index}")
+                 if target_index != -1:
+                     # Seta o índice no Control
+                     requests.post(f"{CONTROL_URL}/sessions/tactic/set/{session_id}", json={'tactic_index': target_index})
+                     logging.info(f"✅ Índice da tática atualizado para {target_index}")
 
-                         # --- VERIFICAÇÃO DE MUDANÇA DE ESTRATÉGIA ---
-                         current_tactic = tactics[target_index]
-                         tactic_name = current_tactic.get('name', '').strip().lower()
-                         valid_names = ["mudanca de estrategia", "mudança de estratégia", "mudança de estrategia", "mudanca de estratégia"]
+                     # --- VERIFICAÇÃO DE MUDANÇA DE ESTRATÉGIA ---
+                     current_tactic = tactics[target_index]
+                     tactic_name = current_tactic.get('name', '').strip().lower()
+                     valid_names = ["mudanca de estrategia", "mudança de estratégia", "mudança de estrategia", "mudanca de estratégia"]
 
-                         if tactic_name in valid_names:
-                             description = str(current_tactic.get('description', ''))
-                             match = re.search(r'\d+', description)
+                     if tactic_name in valid_names:
+                         description = str(current_tactic.get('description', ''))
+                         match = re.search(r'\d+', description)
 
-                             if match:
-                                 target_strategy_id = int(match.group())
-                                 logging.info(f"🔄 Agente escolheu MUDANÇA DE ESTRATÉGIA para ID: {target_strategy_id}")
+                         if match:
+                             target_strategy_id = int(match.group())
+                             logging.info(f"🔄 Agente escolheu MUDANÇA DE ESTRATÉGIA para ID: {target_strategy_id}")
 
-                                 # Aciona a troca temporária
-                                 switch_res = requests.post(
-                                     f"{CONTROL_URL}/sessions/{session_id}/temp_switch_strategy",
-                                     json={'strategy_id': target_strategy_id}
-                                 )
+                             # Aciona a troca temporária
+                             switch_res = requests.post(
+                                 f"{CONTROL_URL}/sessions/{session_id}/temp_switch_strategy",
+                                 json={'strategy_id': target_strategy_id}
+                             )
 
-                                 if switch_res.status_code != 200:
-                                     logging.error(f"❌ Falha ao trocar estratégia (Agente): {switch_res.text}")
-                                 else:
-                                     logging.info("✅ Estratégia trocada com sucesso pelo Agente.")
+                             if switch_res.status_code != 200:
+                                 logging.error(f"❌ Falha ao trocar estratégia (Agente): {switch_res.text}")
                              else:
-                                 logging.warning(f"⚠️ Tática de mudança escolhida, mas sem ID na descrição: {description}")
+                                 logging.info("✅ Estratégia trocada com sucesso pelo Agente.")
+                         else:
+                             logging.warning(f"⚠️ Tática de mudança escolhida, mas sem ID na descrição: {description}")
 
-                         return jsonify({"success": True, "agent_decision": decision}), 200
-                     else:
-                         logging.error("❌ Tática escolhida pelo agente não encontrada na estratégia atual.")
+                     return jsonify({"success": True, "agent_decision": decision}), 200
+                 else:
+                     logging.error("❌ Tática escolhida pelo agente não encontrada na estratégia atual.")
         else:
              logging.error(f"❌ Falha no Agente Strategies: {agent_res.text}")
 
