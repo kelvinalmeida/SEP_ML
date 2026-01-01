@@ -37,7 +37,7 @@ def agent_session_summary(session_id):
         with conn.cursor() as cur:
             # A. Dados da Sessão
             cur.execute("""
-                SELECT status, start_time, current_tactic_index 
+                SELECT status, start_time, current_tactic_index, rating_average, rating_count
                 FROM session 
                 WHERE id = %s
             """, (session_id,))
@@ -92,6 +92,7 @@ def agent_session_summary(session_id):
         DADOS DA SESSÃO:
         - Status: {session_info['status']}
         - Progresso do Plano: {total_strategies} estratégias vinculadas.
+        - Avaliação Média da Turma: {session_info.get('rating_average', 0.0):.1f} estrelas ({session_info.get('rating_count', 0)} votos).
         
         DESEMPENHO NOS EXERCÍCIOS OBRIGATÓRIOS:
         - Quantidade de respostas: {total_exercises}
@@ -224,6 +225,26 @@ def get_student_grades_history(student_id):
                     history_map[sess_key] = {"notes": [], "extra_notes": []}
                 
                 history_map[sess_key]["extra_notes"].append(val)
+
+            # ---------------------------------------------------------
+            # 3. Buscar Avaliações do Aluno (Ratings)
+            # ---------------------------------------------------------
+            cur.execute("""
+                SELECT session_id, rating
+                FROM session_ratings
+                WHERE student_id = %s
+            """, (student_id,))
+
+            ratings = cur.fetchall()
+            for row in ratings:
+                sess_id = row['session_id'] if isinstance(row, dict) else row[0]
+                val = row['rating'] if isinstance(row, dict) else row[1]
+
+                sess_key = str(sess_id)
+                if sess_key not in history_map:
+                    history_map[sess_key] = {"notes": [], "extra_notes": []}
+
+                history_map[sess_key]["student_rating"] = val
 
         # 3. LLM Analysis
         analysis_text = "Análise indisponível"
