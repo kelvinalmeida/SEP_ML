@@ -107,7 +107,10 @@ document.addEventListener("DOMContentLoaded", () => {
         envio_informacao_isActive = false;
 
         countdownInterval = setInterval(() => {
-            if (timeLeft <= 0) {
+            // Evitar auto-avanço se for a tática de "Regra", pois ela tem lógica própria de execução
+            const isRegra = (tacticName === "Regra" || tacticName === "Regras");
+
+            if (timeLeft <= 0 && !isRegra) {
                 clearInterval(countdownInterval);
                 document.getElementById("tacticTimer").innerText = "Concluído";
                 // --- CÓDIGO NOVO: Tenta avançar automaticamente ---
