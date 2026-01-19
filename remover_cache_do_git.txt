@@ -20,3 +20,27 @@ O que acontece: O commit desaparece do histórico.
 Seus arquivos: As alterações continuam lá e já estão na Staging Area (verdes, prontas para um novo commit).
 
 =================================
+
+
+
+ Esse sistema pode considerado agentic IA de acordo com esse artigo anexado? O orquestrador em gateway\routes\orchestrator não é um agente inteligente, ele somente chama e organiza as rotas. Esse sistema pode ser considerado IA Agentica?  Essa 
+
+  rota avalia a estratégia do professor e dá feedback e nota  
+
+ @agente_strategies_bp.route('/agent/critique', methods=['POST']). Essa  
+
+ rota avalia de acordo com o contexto que veio do gateway qual e a  
+
+ próxima tatica @agente_strategies_bp.route('/agent/decide_next_tactic',  
+
+ methods=['POST']). Essa decide se a proxima é uma tatica ou mudança de  
+
+ estratégia @agente_strategies_bp.route('/agent/decide_rules_logic',  
+
+ methods=['POST']) usando o contexto que veio do gateway. Essa no agente  
+
+ de User responde ao pronpt do usuario de acordo com as informações do  
+
+ aluno na sessão @agente_user_bp.route('/agent/chat_history',  
+
+ methods=['GET']).  

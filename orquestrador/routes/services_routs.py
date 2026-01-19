@@ -1,5 +1,5 @@
 USER_URL = 'http://user:5002'
-CONTROL_URL = 'http://controller:5001'
+CONTROL_URL = 'http://agente_sessao:5001'
 STRATEGIES_URL = 'http://strategies:5003'
 DOMAIN_URL = 'http://domain:5004'
 

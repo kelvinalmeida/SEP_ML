@@ -160,8 +160,8 @@ INSERT INTO pdf (filename, path, domain_id) VALUES
 
 -- Vídeos YouTube do Domínio 2
 INSERT INTO video_youtube (url, domain_id) VALUES 
-('https://www.youtube.com/watch?v=35dJZOY6Sdo', 2),
-('https://www.youtube.com/watch?v=OYdi6TFfPNA', 2);
+('https://www.youtube.com/watch?v=N-VMAIvm3W4', 2),
+('https://www.youtube.com/watch?v=4p7axLXXBGU', 2);
 
 -- Vídeo Uploaded do Domínio 2
 INSERT INTO video_upload (filename, path, domain_id) VALUES 
