@@ -114,7 +114,7 @@ def agent_session_summary(session_id):
         3. A sessão parece fluir bem ou está estagnada (poucas respostas)?
         """
 
-        return jsonify({"debug_prompt": prompt}), 200  # DEBUG: Retorna o prompt gerado
+        # return jsonify({"debug_prompt": prompt}), 200  # DEBUG: Retorna o prompt gerado
 
         # 4. Chamada LLM (Groq)
         client = OpenAI(
@@ -287,7 +287,7 @@ def get_student_grades_history(student_id):
         }), 200
 
     except Exception as e:
-        logging.error(f"Erro ao buscar histórico do aluno {username}: {str(e)}")
+        logging.error(f"Erro ao buscar histórico do aluno.")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
