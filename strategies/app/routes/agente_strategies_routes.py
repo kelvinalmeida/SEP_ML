@@ -316,7 +316,8 @@ def decide_rules_logic():
     # --- 1. Extração do Contexto ---
     performance_summary = data.get('performance_summary', 'Sem dados.')
     student_profile = data.get('student_profile_summary', 'Perfil desconhecido.')
-    domain_content = data.get('article_text', '')[:800] 
+    # domain_content = data.get('article_text', '')[:800] 
+    domain_content = data.get('article_text', '')
     
     current_strategy_id = data.get('strategy_id')
     executed_tactics_ids = data.get('executed_tactics', [])
@@ -409,6 +410,10 @@ def decide_rules_logic():
             "reasoning": "<Explique por que escolheu ESSE ID específico (ex: 'Escolhi a estratégia X pois tem nota 9' ou 'Repeti o Reuso pois a turma falhou na teoria')>"
         }}
         """
+
+        # return jsonify({"debug_prompt": prompt}), 200  # DEBUG: Retorna o prompt gerado
+
+        logging.info(f"Prompt enviado ao LLM de Regras: {prompt}")
 
         # --- 4. Chamada LLM ---
         response = client.chat.completions.create(

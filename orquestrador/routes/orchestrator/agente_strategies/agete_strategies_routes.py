@@ -113,7 +113,8 @@ def execute_rules_logic(session_id):
             # Control retorna strategies como lista de strings/ints
             strategies_list = session_data.get('strategies', [])
             strategy_id = strategies_list[0] if strategies_list else None
-
+            domain_id = int(session_data.get('domains', None)[0]) if session_data.get('domains') else None
+            # return  jsonify(domain_id)
             current_tactic_index = session_data.get('current_tactic_index', 0)
             student_ids = session_data.get('students', [])
         except Exception as e:
@@ -188,7 +189,16 @@ def execute_rules_logic(session_id):
         # E. Do Serviço Domain: Conteúdo da Aula
         article_text = ""
         try:
-            domain_response = requests.get(f"{DOMAIN_URL}/get_content/2", timeout=10)
+            # domain_response = requests.get(f"{DOMAIN_URL}/get_content/2", timeout=10)
+            domain_response = requests.get(f"{DOMAIN_URL}/domains/{domain_id}", timeout=10)
+            domain_name_and_description = {
+                "Conteudo da aula": domain_response.json().get("name", ""),
+                "description do conteúdo da aula": domain_response.json().get("description", "")
+            }   
+            # return jsonify(domain_name_and_description)
+
+
+
             if domain_response.status_code == 200:
                 article_text = domain_response.json().get('content', "")
         except Exception as e:
@@ -200,7 +210,7 @@ def execute_rules_logic(session_id):
             "executed_tactics": executed_tactics_ids,
             "performance_summary": agent_summary_text,
             "student_profile_summary": student_profile_summary,
-            "article_text": article_text
+            "article_text": domain_name_and_description
         }
 
         decision_data = {}
