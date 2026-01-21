@@ -206,10 +206,20 @@ def decide_next_tactic():
         Você é um Arquiteto Pedagógico (Agente de Estratégia).
         Escolha a PRÓXIMA ação de ensino baseada no perfil e histórico.
 
+        === Como as taticas funcionam ===
+        - Tática de Reuso: Apresenta recursos didáticos de um domínio, como definições e exemplos, por um tempo estipulado.
+
+        - Tática de Debate Síncrono: Realiza interações em tempo real via chat entre alunos e professores por um período determinado.
+
+        - Tática de Envio de Informação: Envia materiais e conteúdos educativos para os e-mails dos alunos de forma direta.
+
+        - Tática de Mudança de Estratégia: Possibilita a troca da estratégia didática atual por uma nova abordagem durante a sessão.
+
+        - Tática de Regras: Define ações que são disparadas apenas quando condições específicas de seleção são atendidas.
+
         === CONTEXTO ===
         Tema: {domain_name}
         Descrição: {domain_description}
-        Trecho do Material: {article_text[:500]}...
 
         === PERFIL DO ALUNO ===
         {student_profile_summary}
@@ -222,10 +232,10 @@ def decide_next_tactic():
         {tactics_joined}
 
         === REGRAS ===
-        1. Olhe para o "Táticas já realizadas" para não repetir as taticas.
+        1. Não seja linear na escolha das taticas, ou seja, escolha as tatica de maneira que melhore o aprendizado.
         2. Considere o tempo disponível.
         3. Se o desempenho for RUIM, simplifique. Se for BOM, aprofunde.
-        4. Não seja linear na escolha das taticas, ou seja, se falta executar taticas de id 1, 2 e 3, escolha a de id 3 depois a 2 e por fim a 1.
+        4. Olhe para o "Táticas já realizadas" para não repetir as taticas.
 
         === SAÍDA (JSON) ===
         Responda APENAS:
@@ -306,7 +316,8 @@ def decide_rules_logic():
     # --- 1. Extração do Contexto ---
     performance_summary = data.get('performance_summary', 'Sem dados.')
     student_profile = data.get('student_profile_summary', 'Perfil desconhecido.')
-    domain_content = data.get('article_text', '')[:800] 
+    # domain_content = data.get('article_text', '')[:800] 
+    domain_content = data.get('article_text', '')
     
     current_strategy_id = data.get('strategy_id')
     executed_tactics_ids = data.get('executed_tactics', [])
@@ -399,6 +410,10 @@ def decide_rules_logic():
             "reasoning": "<Explique por que escolheu ESSE ID específico (ex: 'Escolhi a estratégia X pois tem nota 9' ou 'Repeti o Reuso pois a turma falhou na teoria')>"
         }}
         """
+
+        # return jsonify({"debug_prompt": prompt}), 200  # DEBUG: Retorna o prompt gerado
+
+        logging.info(f"Prompt enviado ao LLM de Regras: {prompt}")
 
         # --- 4. Chamada LLM ---
         response = client.chat.completions.create(

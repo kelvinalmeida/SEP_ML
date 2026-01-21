@@ -13,6 +13,8 @@ except ImportError:
 
 agente_user_bp = Blueprint('agente_user_bp', __name__)
 
+logging.basicConfig(level=logging.INFO)
+
 def ensure_tutor_chat_table(conn):
     """Garante que a tabela de histórico do tutor existe."""
     with conn.cursor() as cur:
@@ -76,6 +78,7 @@ def summarize_preferences():
             profiles_text.append(f"- Aluno {name}: Prefere '{p_type}' via '{p_comm}'. {txt_email}.")
         
         profiles_joined = "\n".join(profiles_text)
+        
 
         prompt = f"""
         Atue como um Especialista Pedagógico.
@@ -90,6 +93,8 @@ def summarize_preferences():
         FORMATO DE SAÍDA:
         Apenas o texto corrido, sem formatação JSON, sem markdown e sem títulos.
         """
+
+        logging.info(f"Prompt para Agente User: {prompt}")
 
         client = OpenAI(
             api_key=Config.GROQ_API_KEY,

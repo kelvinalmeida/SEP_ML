@@ -9,6 +9,7 @@ from pypdf import PdfReader
 
 agete_user_bp = Blueprint('agete_user_bp', __name__)
 
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -141,7 +142,7 @@ def ask_tutor(current_user):
         "study_context": study_context
     }
 
-    # return jsonify(final_payload), 200
+    logging.info(f"Payload final preparado para Agente User: {final_payload}")
 
     try:
         logging.info(f"Enviando payload para User Service: {USER_URL}/agent/generate_student_feedback")

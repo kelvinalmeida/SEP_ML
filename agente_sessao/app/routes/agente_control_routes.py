@@ -5,6 +5,9 @@ from google import genai
 from config import Config
 from openai import OpenAI
 
+
+logging.basicConfig(level=logging.INFO)
+
 # Tenta importar a conexão do banco de dados
 try:
     from db import create_connection
@@ -15,7 +18,7 @@ agente_control_bp = Blueprint('agente_control_bp', __name__)
 
 # ... (Mantenha suas outras rotas existentes: create_session, etc.) ...
 
-# ==============================================================================
+# ============================================================================== 
 # AGENTE DE MEMÓRIA (CONTROL): RESUMO GERAL DA SESSÃO (Foco na Turma/Estratégia)
 # ==============================================================================
 @agente_control_bp.route('/sessions/<int:session_id>/agent_summary', methods=['GET'])
@@ -110,6 +113,8 @@ def agent_session_summary(session_id):
         2. Existe interesse/adesão ao conteúdo extra?
         3. A sessão parece fluir bem ou está estagnada (poucas respostas)?
         """
+
+        # return jsonify({"debug_prompt": prompt}), 200  # DEBUG: Retorna o prompt gerado
 
         # 4. Chamada LLM (Groq)
         client = OpenAI(
@@ -264,6 +269,9 @@ def get_student_grades_history(student_id):
                 Responda com um parágrafo conciso.
                 """
 
+                logging.info(f"Prompt para análise de histórico de notas: {prompt}")
+                # return f"prompt: {prompt}"
+
                 resp = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[{"role": "user", "content": prompt}],
@@ -279,7 +287,7 @@ def get_student_grades_history(student_id):
         }), 200
 
     except Exception as e:
-        logging.error(f"Erro ao buscar histórico do aluno {username}: {str(e)}")
+        logging.error(f"Erro ao buscar histórico do aluno.")
         return jsonify({"error": str(e)}), 500
     finally:
         if conn:
